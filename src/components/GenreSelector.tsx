@@ -31,7 +31,7 @@ export function GenreSelector({ selected, onChange }: Props) {
     <div>
       <h2 className="text-xl font-display font-semibold mb-2">ジャンルを選択</h2>
       <p className="text-muted-foreground text-sm mb-6">複数選択でジャンル融合も可能です</p>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
         {GENRES.map((genre, i) => {
           const Icon = iconMap[genre.icon] || Music;
           const isSelected = selected.includes(genre.id);

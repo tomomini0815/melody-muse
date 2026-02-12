@@ -8,6 +8,7 @@ import {
 import { motion } from "framer-motion";
 import { analyzeAudioFile, AudioFeatures, performClustering } from "@/lib/audio-analysis";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ArrowLeft, Loader2, Music, Upload, Info, Download, Sparkles, Copy, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -275,24 +276,24 @@ export default function AudioAnalysis() {
     };
 
     return (
-        <div className="min-h-screen bg-background relative overflow-hidden p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
+        <div className="min-h-screen bg-background relative overflow-hidden p-4 sm:p-8">
+            <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
 
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4">
                         <Link to="/">
-                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10">
+                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10 h-9 w-9">
                                 <ArrowLeft className="w-5 h-5" />
                             </Button>
                         </Link>
                         <div>
-                            <h1 className="text-3xl font-display font-bold gradient-text">Audio Analysis Studio</h1>
-                            <p className="text-sm text-muted-foreground">楽曲ライブラリの音響特性を可視化します</p>
+                            <h1 className="text-xl sm:text-3xl font-display font-bold gradient-text">Audio Analysis Studio</h1>
+                            <p className="text-xs sm:text-sm text-muted-foreground">楽曲ライブラリの音響特性を可視化します</p>
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                         <input
                             type="file"
                             id="import-json"
@@ -327,9 +328,12 @@ export default function AudioAnalysis() {
                         onDragOver={onDragOver}
                         onDragLeave={onDragLeave}
                         onDrop={onDrop}
-                        className={`border-2 border-dashed rounded-3xl p-20 text-center transition-all glass relative cursor-pointer
-                    ${isDragActive ? "border-primary bg-primary/5" : "border-zinc-800 hover:border-zinc-600 hover:bg-white/5"}
-                `}
+                        className={cn(
+                            "glass-card rounded-3xl p-6 sm:p-12 border-2 border-dashed transition-all cursor-pointer group",
+                            isDragActive
+                                ? "border-primary bg-primary/10 scale-[0.99]"
+                                : "border-white/10 hover:border-primary/30"
+                        )}
                         onClick={() => document.getElementById('file-upload')?.click()}
                     >
                         <input
@@ -343,23 +347,20 @@ export default function AudioAnalysis() {
                             webkitdirectory=""
                         />
 
-                        <div className="flex flex-col items-center gap-6 z-10 relative pointer-events-none">
-                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-zinc-800 to-black border border-white/10 flex items-center justify-center shadow-2xl">
-                                {analyzing ? <Loader2 className="w-10 h-10 animate-spin text-primary" /> : <Upload className="w-10 h-10 text-primary" />}
+                        <div className="flex flex-col items-center gap-4 sm:gap-6 text-center">
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                {analyzing ? <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-spin" /> : <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-pulse" />}
                             </div>
-
                             <div className="space-y-2">
-                                <h3 className="text-3xl font-bold tracking-tight">
-                                    {analyzing ? `分析中... ${progress.current}/${progress.total}` : "フォルダをドロップ"}
-                                </h3>
-                                <p className="text-zinc-400 max-w-md mx-auto">
-                                    音楽ファイルの入ったフォルダをドラッグ＆ドロップしてください。
-                                    <br /><span className="text-xs opacity-50">MP3, WAV, FLAC 対応</span>
+                                <h2 className="text-xl sm:text-2xl font-display font-bold">
+                                    {analyzing ? `分析中... ${progress.current}/${progress.total}` : "ドロップして分析を開始"}
+                                </h2>
+                                <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto">
+                                    楽曲ファイルまたは<span className="text-primary font-bold">フォルダごと</span>ドロップしてください
                                 </p>
                             </div>
-
                             {!analyzing && (
-                                <Button variant="outline" className="mt-4 border-white/20 hover:bg-white/10 pointer-events-none">
+                                <Button className="gradient-primary h-10 sm:h-12 px-6 sm:px-8 rounded-full text-sm sm:text-base">
                                     ファイルを選択
                                 </Button>
                             )}
@@ -372,107 +373,106 @@ export default function AudioAnalysis() {
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
 
                         {/* Chart Section */}
-                        <Card className="glass border-white/5 bg-black/40 backdrop-blur-md overflow-hidden">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-xl font-light">
-                                    <div className="flex items-center gap-2">
-                                        <Music className="w-5 h-5 text-primary" />
-                                        楽曲特性マップ (Sonic Landscape)
-                                    </div>
+                        <Card className="glass-card border-white/5 overflow-hidden">
+                            <CardHeader className="p-4 sm:p-6 pb-2">
+                                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                                    楽曲特性マップ (Sonic Landscape)
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="h-[600px] w-full p-4 relative">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+                            <CardContent className="p-2 sm:p-6 pt-0">
+                                <div className="h-[350px] sm:h-[500px] md:h-[600px] w-full relative">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
 
-                                        <XAxis
-                                            type="number" dataKey="brightness" name="Brightness" unit="%"
-                                            label={{ value: 'Brightness (Timbre)', position: 'bottom', fill: '#666', offset: 0 }}
-                                            stroke="#555" domain={[0, 100]} tick={{ fill: '#666' }}
-                                        />
-                                        <YAxis
-                                            type="number" dataKey="energy" name="Energy" unit="%"
-                                            label={{ value: 'Energy (Intensity)', angle: -90, position: 'insideLeft', fill: '#666' }}
-                                            stroke="#555" domain={[0, 100]} tick={{ fill: '#666' }}
-                                        />
-                                        <ZAxis type="number" dataKey="size" range={[50, 400]} />
+                                            <XAxis
+                                                type="number" dataKey="brightness" name="Brightness" unit="%"
+                                                label={{ value: 'Brightness (Timbre)', position: 'bottom', fill: '#666', offset: 0 }}
+                                                stroke="#555" domain={[0, 100]} tick={{ fill: '#666' }}
+                                            />
+                                            <YAxis
+                                                type="number" dataKey="energy" name="Energy" unit="%"
+                                                label={{ value: 'Energy (Intensity)', angle: -90, position: 'insideLeft', fill: '#666' }}
+                                                stroke="#555" domain={[0, 100]} tick={{ fill: '#666' }}
+                                            />
+                                            <ZAxis type="number" dataKey="size" range={[50, 400]} />
 
-                                        <ReferenceLine x={50} stroke="#444" strokeDasharray="3 3" />
-                                        <ReferenceLine y={50} stroke="#444" strokeDasharray="3 3" />
+                                            <ReferenceLine x={50} stroke="#444" strokeDasharray="3 3" />
+                                            <ReferenceLine y={50} stroke="#444" strokeDasharray="3 3" />
 
-                                        <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Bright", position: 'insideTopRight', fill: '#4ade80', fontSize: 12, opacity: 0.5 }} />
-                                        <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Dark", position: 'insideTopLeft', fill: '#ff4b4b', fontSize: 12, opacity: 0.5 }} />
-                                        <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Bright", position: 'insideBottomRight', fill: '#00d4ff', fontSize: 12, opacity: 0.5 }} />
-                                        <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Dark", position: 'insideBottomLeft', fill: '#a855f7', fontSize: 12, opacity: 0.5 }} />
+                                            <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Bright", position: 'insideTopRight', fill: '#4ade80', fontSize: 12, opacity: 0.5 }} />
+                                            <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Dark", position: 'insideTopLeft', fill: '#ff4b4b', fontSize: 12, opacity: 0.5 }} />
+                                            <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Bright", position: 'insideBottomRight', fill: '#00d4ff', fontSize: 12, opacity: 0.5 }} />
+                                            <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Dark", position: 'insideBottomLeft', fill: '#a855f7', fontSize: 12, opacity: 0.5 }} />
 
-                                        <Tooltip
-                                            cursor={{ strokeDasharray: '3 3' }}
-                                            content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    const data = payload[0].payload as AudioFeatures;
-                                                    return (
-                                                        <div className="glass p-4 rounded-xl border border-white/10 bg-black/90 shadow-xl">
-                                                            <p className="font-bold text-primary mb-2 text-sm">{data.name}</p>
-                                                            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-zinc-400">
-                                                                <span>Tempo:</span> <span className="text-white">~{Math.round(data.tempo)} BPM</span>
-                                                                <span>Bright:</span> <span className="text-white">{Math.round(data.brightness)}%</span>
-                                                                <span>Energy:</span> <span className="text-white">{Math.round(data.energy)}%</span>
+                                            <Tooltip
+                                                cursor={{ strokeDasharray: '3 3' }}
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const data = payload[0].payload as AudioFeatures;
+                                                        return (
+                                                            <div className="glass p-4 rounded-xl border border-white/10 bg-black/90 shadow-xl">
+                                                                <p className="font-bold text-primary mb-2 text-sm">{data.name}</p>
+                                                                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-zinc-400">
+                                                                    <span>Tempo:</span> <span className="text-white">~{Math.round(data.tempo)} BPM</span>
+                                                                    <span>Bright:</span> <span className="text-white">{Math.round(data.brightness)}%</span>
+                                                                    <span>Energy:</span> <span className="text-white">{Math.round(data.energy)}%</span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }}
-                                        />
-                                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
 
-                                        {Object.keys(groupedResults).map((clusterKey) => {
-                                            const index = parseInt(clusterKey);
-                                            return (
-                                                <Scatter
-                                                    key={index}
-                                                    name={CLUSTER_NAMES[index] || `Cluster ${index + 1}`}
-                                                    data={groupedResults[index]}
-                                                    fill={CLUSTER_COLORS[index % CLUSTER_COLORS.length]}
-                                                    fillOpacity={0.8}
-                                                />
-                                            );
-                                        })}
-                                    </ScatterChart>
-                                </ResponsiveContainer>
+                                            {Object.keys(groupedResults).map((clusterKey) => {
+                                                const index = parseInt(clusterKey);
+                                                return (
+                                                    <Scatter
+                                                        key={index}
+                                                        name={CLUSTER_NAMES[index] || `Cluster ${index + 1}`}
+                                                        data={groupedResults[index]}
+                                                        fill={CLUSTER_COLORS[index % CLUSTER_COLORS.length]}
+                                                        fillOpacity={0.8}
+                                                    />
+                                                );
+                                            })}
+                                        </ScatterChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </CardContent>
                         </Card>
 
                         {/* Grouped Lists */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                             {Object.keys(groupedResults).map((clusterKey) => {
                                 const index = parseInt(clusterKey);
-                                const clusterName = CLUSTER_NAMES[index] || `Cluster ${index + 1}`;
-                                const color = CLUSTER_COLORS[index % CLUSTER_COLORS.length];
-                                const items = groupedResults[index];
-
+                                const clusterFiles = groupedResults[index];
                                 return (
-                                    <Card key={index} className="glass border-white/5 bg-transparent overflow-hidden flex flex-col h-full">
-                                        <CardHeader className="pb-3 border-b border-white/5 bg-white/5">
+                                    <Card key={index} className="glass-card border-white/5 bg-black/20">
+                                        <CardHeader className="p-4 sm:p-6">
                                             <div className="flex items-center justify-between">
-                                                <CardTitle className="text-base font-medium flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full shadow-[0_0_10px]" style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }} />
-                                                    {clusterName}
+                                                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CLUSTER_COLORS[index % CLUSTER_COLORS.length] }} />
+                                                    {CLUSTER_NAMES_JA[index]}
                                                 </CardTitle>
-                                                <Badge variant="secondary" className="bg-black/20 text-xs">{items.length} 曲</Badge>
+                                                <Badge variant="secondary" className="bg-white/5 text-[10px] sm:text-xs">
+                                                    {clusterFiles.length} 曲
+                                                </Badge>
                                             </div>
                                         </CardHeader>
-                                        <CardContent className="p-0 overflow-y-auto max-h-[400px]">
-                                            <div className="divide-y divide-white/5">
-                                                {items.map((file, i) => (
-                                                    <div key={i} className="p-4 hover:bg-white/5 transition-colors flex items-center justify-between group">
-                                                        <div className="min-w-0 pr-4">
-                                                            <p className="text-sm font-medium truncate text-zinc-200 group-hover:text-white transition-colors">
-                                                                {file.name}
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                                テンポ: {Math.round(file.tempo)} • Energy: {Math.round(file.energy)}%
+                                        <CardContent className="p-2 sm:p-4 pt-0">
+                                            <div className="space-y-1 max-h-[300px] sm:max-h-[400px] overflow-y-auto pr-1 sm:pr-2 custom-scrollbar">
+                                                {clusterFiles.map((file, i) => (
+                                                    <div key={i} className="group flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                                        <div className="flex-1 min-w-0 mr-2">
+                                                            <p className="text-xs sm:text-sm font-medium truncate">{file.name}</p>
+                                                            <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                                                                <span className="shrink-0">テンポ: {Math.round(file.tempo)}</span>
+                                                                <span className="text-zinc-700">•</span>
+                                                                <span className="truncate">Energy: {Math.round(file.energy)}%</span>
                                                             </p>
                                                         </div>
                                                         <Popover>

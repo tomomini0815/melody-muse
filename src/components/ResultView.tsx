@@ -21,12 +21,12 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   const copyText = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
     setCopied(label);
-    toast({ title: `${label}をコピーしました` });
+    toast({ title: `${label} をコピーしました` });
     setTimeout(() => setCopied(null), 2000);
   };
 
   const copyAll = () => {
-    const full = `Style Tags: ${prompt.styleTags}\n\nBPM: ${prompt.meta.bpm} | Key: ${prompt.meta.key} | Instruments: ${prompt.meta.instruments}\n\n${prompt.lyrics}`;
+    const full = `Style Tags: ${prompt.styleTags} \n\nBPM: ${prompt.meta.bpm} | Key: ${prompt.meta.key} | Instruments: ${prompt.meta.instruments} \n\n${prompt.lyrics} `;
     copyText(full, "全体");
   };
 
@@ -46,7 +46,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
 
 
   const handleOpenSuno = async () => {
-    const full = `Style Tags: ${prompt.styleTags}\n\n[Lyrics]\n${prompt.lyrics}`;
+    const full = `Style Tags: ${prompt.styleTags} \n\n[Lyrics]\n${prompt.lyrics} `;
     await navigator.clipboard.writeText(full);
     toast({ title: "プロンプトをコピーしてSuno AIを開きます" });
     window.open("https://suno.com/create", "_blank");
@@ -60,25 +60,25 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-display font-semibold">生成結果</h2>
           {isStreaming && <Equalizer bars={4} />}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleTranslate} disabled={isTranslating || isStreaming}>
-            <Languages className="w-4 h-4 mr-1" />
+        <div className="grid grid-cols-2 sm:flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleTranslate} disabled={isTranslating || isStreaming} className="text-xs sm:text-sm">
+            <Languages className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
             {isTranslating ? "翻訳中..." : prompt.config.language === "ja" ? "英訳" : "和訳"}
           </Button>
-          <Button variant="outline" size="sm" onClick={onToggleFavorite}>
-            <Star className={`w-4 h-4 mr-1 ${prompt.isFavorite ? "fill-yellow-400 text-yellow-400" : ""}`} />
-            {prompt.isFavorite ? "お気に入り済" : "お気に入り"}
+          <Button variant="outline" size="sm" onClick={onToggleFavorite} className="text-xs sm:text-sm">
+            <Star className={`w - 3.5 h - 3.5 sm: w - 4 sm: h - 4 mr - 1 ${prompt.isFavorite ? "fill-yellow-400 text-yellow-400" : ""} `} />
+            <span className="truncate">{prompt.isFavorite ? "お気に入り済" : "お気に入り"}</span>
           </Button>
-          <Button size="sm" onClick={copyAll} className="gradient-primary">
-            <Copy className="w-4 h-4 mr-1" /> 一括コピー
+          <Button size="sm" onClick={copyAll} className="gradient-primary text-xs sm:text-sm">
+            <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" /> 一括コピー
           </Button>
-          <Button size="sm" onClick={handleOpenSuno} className="bg-black hover:bg-zinc-800 text-white border border-zinc-700">
-            <ExternalLink className="w-4 h-4 mr-1" /> Sunoで作る
+          <Button size="sm" onClick={handleOpenSuno} className="bg-black hover:bg-zinc-800 text-white border border-zinc-700 text-xs sm:text-sm">
+            <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" /> Sunoで作る
           </Button>
         </div>
       </div>
@@ -96,7 +96,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
       <div className="glass rounded-xl p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-primary">メタ情報</h3>
-          <CopyBtn text={`BPM: ${prompt.meta.bpm} | Key: ${prompt.meta.key} | Instruments: ${prompt.meta.instruments}`} label="メタ情報" />
+          <CopyBtn text={`BPM: ${prompt.meta.bpm} | Key: ${prompt.meta.key} | Instruments: ${prompt.meta.instruments} `} label="メタ情報" />
         </div>
         <div className="flex gap-4 text-sm">
           <span className="text-muted-foreground">BPM: <span className="text-foreground">{prompt.meta.bpm}</span></span>

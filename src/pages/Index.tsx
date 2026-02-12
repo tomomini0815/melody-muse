@@ -141,26 +141,29 @@ export default function Index() {
       {/* Header */}
       <header className="relative z-10 border-b border-border">
         <div className="container max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-              <Music className="w-5 h-5 text-primary-foreground" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl gradient-primary flex items-center justify-center shrink-0">
+              <Music className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-display font-bold gradient-text">MusicAI Prompt Studio</h1>
-              <p className="text-xs text-muted-foreground">音楽プロンプトジェネレーター</p>
+              <h1 className="text-sm sm:text-lg font-display font-bold gradient-text">MusicAI Prompt Studio</h1>
+              <p className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">音楽プロンプトジェネレーター</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2">
             <Link to="/analysis">
-              <Button variant="ghost" size="sm">
-                <AudioWaveform className="w-4 h-4 mr-1" /> 分析スタジオ
+              <Button variant="ghost" size="sm" className="px-2 sm:px-3 h-8 sm:h-9">
+                <AudioWaveform className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
+                <span className="hidden sm:inline">分析スタジオ</span>
               </Button>
             </Link>
-            <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating}>
-              <Shuffle className="w-4 h-4 mr-1" /> ランダム
+            <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating} className="px-2 sm:px-3 h-8 sm:h-9">
+              <Shuffle className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
+              <span className="hidden sm:inline">ランダム</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
-              <Clock className="w-4 h-4 mr-1" /> 履歴
+            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)} className="px-2 sm:px-3 h-8 sm:h-9">
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
+              <span className="hidden sm:inline">履歴</span>
             </Button>
           </div>
         </div>
