@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { Copy, Check, Languages, Star, ExternalLink, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Copy, Check, Languages, Star, ExternalLink, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { GeneratedPrompt } from "@/lib/types";
 import { toast } from "@/hooks/use-toast";
-import { translateLyrics, generateCoverArt } from "@/lib/stream-chat";
+import { translateLyrics, generateCoverArt, refineStyleTags } from "@/lib/stream-chat";
 import { Equalizer } from "./Equalizer";
 
 interface Props {
@@ -20,6 +20,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   const [copied, setCopied] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
 
   const copyText = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
@@ -68,6 +69,23 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     }
   };
 
+  const handleRefinePrompt = async () => {
+    if (!prompt.originalPrompt) {
+      toast({ title: "説明を入力してください", variant: "destructive" });
+      return;
+    }
+    setIsRefining(true);
+    try {
+      const refined = await refineStyleTags(prompt.originalPrompt);
+      onUpdatePrompt({ ...prompt, styleTags: refined });
+      toast({ title: "プロンプトをブラッシュアップしました" });
+    } catch (e) {
+      toast({ title: "変換エラー", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
   const CopyBtn = ({ text, label }: { text: string; label: string }) => (
     <Button variant="ghost" size="icon" onClick={() => copyText(text, label)} className="h-8 w-8">
       {copied === label ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
@@ -113,6 +131,33 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
+          {/* Original Prompt Card (New) */}
+          <div className="glass rounded-xl p-4 border-primary/20 bg-primary/5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                オリジナルプロンプト
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefinePrompt}
+                disabled={isRefining || isStreaming}
+                className="h-8 text-[10px] sm:text-xs gap-1.5 hover:bg-primary/20 text-primary-foreground font-bold gradient-primary border-none rounded-full px-4"
+              >
+                {isRefining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                <span>ブラッシュアップ</span>
+              </Button>
+            </div>
+            <Textarea
+              placeholder="楽曲の雰囲気や構成を文章で入力してください... (例: 疾走感のある切ないボカロ曲、ピアノと重いベースの融合)"
+              value={prompt.originalPrompt || ""}
+              onChange={(e) => onUpdatePrompt({ ...prompt, originalPrompt: e.target.value })}
+              className="min-h-[80px] bg-background/30 border-primary/10 text-sm focus-visible:ring-primary/30"
+              disabled={isStreaming}
+            />
+          </div>
+
           {/* Cover Art Section */}
           {prompt.coverUrl && (
             <div className="glass rounded-2xl overflow-hidden aspect-square relative group">
@@ -131,7 +176,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
               <h3 className="text-sm font-semibold text-primary">Style Tags</h3>
               <CopyBtn text={prompt.styleTags} label="スタイルタグ" />
             </div>
-            <p className="font-mono text-sm text-accent">{prompt.styleTags}</p>
+            <p className="font-mono text-sm text-accent leading-relaxed">{prompt.styleTags}</p>
           </div>
 
           {/* Meta */}
@@ -140,9 +185,9 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
               <h3 className="text-sm font-semibold text-primary">メタ情報</h3>
               <CopyBtn text={`BPM: ${prompt.meta.bpm} | Key: ${prompt.meta.key} | Instruments: ${prompt.meta.instruments} `} label="メタ情報" />
             </div>
-            <div className="flex gap-4 text-sm">
-              <span className="text-muted-foreground">BPM: <span className="text-foreground">{prompt.meta.bpm}</span></span>
-              <span className="text-muted-foreground">Key: <span className="text-foreground">{prompt.meta.key}</span></span>
+            <div className="flex gap-4 text-sm flex-wrap">
+              <span className="text-muted-foreground">BPM: <span className="text-foreground font-mono">{prompt.meta.bpm}</span></span>
+              <span className="text-muted-foreground">Key: <span className="text-foreground font-mono">{prompt.meta.key}</span></span>
               <span className="text-muted-foreground">楽器: <span className="text-foreground">{prompt.meta.instruments}</span></span>
             </div>
           </div>

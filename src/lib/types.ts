@@ -44,6 +44,7 @@ export interface GeneratedPrompt {
   createdAt: number;
   isFavorite: boolean;
   coverUrl?: string;
+  originalPrompt?: string;
 }
 
 export const GENRES: Genre[] = [

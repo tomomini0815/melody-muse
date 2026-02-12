@@ -149,3 +149,27 @@ export async function generateCoverArt(lyrics: string, styleTags: string): Promi
   const data = await resp.json();
   return data.imageUrl;
 }
+
+export async function refineStyleTags(prompt: string): Promise<string> {
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.0-flash-exp",
+      messages: [
+        {
+          role: "system",
+          content: "You are a Suno AI prompt expert. Convert the user's music description into a concise, effective comma-separated list of English style tags (max 120 characters total). Only output the tags themselves inside brackets, e.g. [upbeat pop, disco strings, energetic]."
+        },
+        { role: "user", content: prompt }
+      ],
+    }),
+  });
+
+  if (!resp.ok) throw new Error("プロンプトの更新に失敗しました。");
+  const data = await resp.json();
+  return data.choices[0].message.content;
+}
