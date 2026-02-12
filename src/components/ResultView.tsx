@@ -76,8 +76,19 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     }
     setIsRefining(true);
     try {
-      const refined = await refineStyleTags(prompt.originalPrompt);
-      onUpdatePrompt({ ...prompt, styleTags: refined });
+      const refinedRaw = await refineStyleTags(prompt.originalPrompt);
+
+      // ブラケット [] を除去し、カンマで分割してクリーンアップ
+      const cleanTags = (text: string) => text.replace(/[\[\]]/g, '').split(',').map(t => t.trim()).filter(t => t !== "");
+
+      const existingTags = cleanTags(prompt.styleTags);
+      const newTags = cleanTags(refinedRaw);
+
+      // 結合して重複を排除
+      const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
+      const finalStyleTags = mergedTags.join(", ");
+
+      onUpdatePrompt({ ...prompt, styleTags: finalStyleTags });
       toast({ title: "プロンプトをブラッシュアップしました" });
     } catch (e) {
       toast({ title: "変換エラー", description: (e as Error).message, variant: "destructive" });
