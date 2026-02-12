@@ -10,7 +10,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { genres, mood, tempo, bpm, themes, customTheme, language, duration } = await req.json();
+    const { genres, mood, tempo, bpm, themes, customTheme, language, duration, artist } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -48,6 +48,7 @@ Rules:
 - List specific instruments that would suit the genre/mood combination`;
 
     const userPrompt = `Create a song with these specifications:
+    ${artist ? `- Style/Artist Influence: Similar to ${artist} (mimic their typical musical style, vocal phrasing, and lyrical themes)` : ""}
 - Genres: ${genres.join(", ")}
 - Mood: ${mood}
 - Tempo: ${tempo === "custom" ? `${bpm} BPM` : tempo}

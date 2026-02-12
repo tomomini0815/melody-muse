@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
-import { MusicConfig, MOODS, THEMES, Tempo, Language, Duration } from "@/lib/types";
+import { MusicConfig, MOODS, THEMES, Tempo, Language, Duration, ARTISTS } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import {
-  Sun, Moon, Zap, Feather, CloudRain, Sparkles,
+  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User,
 } from "lucide-react";
 
 const moodIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -130,6 +130,75 @@ export function CustomizeForm({ config, onChange }: Props) {
           onChange={(e) => update({ customTheme: e.target.value })}
           className="bg-secondary border-border"
         />
+      </div>
+
+      {/* Artists */}
+      <div>
+        <h3 className="text-lg font-display font-semibold mb-3">
+          <span className="flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            アーティストスタイル (任意)
+          </span>
+        </h3>
+        <p className="text-sm text-muted-foreground mb-3">
+          有名なアーティストのスタイルを参考にします（※あくまでスタイル模倣です）
+        </p>
+
+        <div className="space-y-4">
+          {/* Global Artists */}
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Global</h4>
+            <div className="flex gap-2 flex-wrap">
+              {ARTISTS.filter(a => a.category === "global").map((artist) => {
+                const isSelected = config.artist === artist.id;
+                return (
+                  <button
+                    key={artist.id}
+                    onClick={() => update({ artist: isSelected ? "" : artist.id })}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full border text-sm transition-all relative overflow-hidden",
+                      isSelected
+                        ? "border-primary bg-primary/20 text-primary-foreground font-medium shadow-[0_0_15px_rgba(251,191,36,0.3)]"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    )}
+                  >
+                    {isSelected && (
+                      <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ transform: 'skewX(-20deg)' }} />
+                    )}
+                    {artist.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Japanese Artists */}
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Japanese</h4>
+            <div className="flex gap-2 flex-wrap">
+              {ARTISTS.filter(a => a.category === "japanese").map((artist) => {
+                const isSelected = config.artist === artist.id;
+                return (
+                  <button
+                    key={artist.id}
+                    onClick={() => update({ artist: isSelected ? "" : artist.id })}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full border text-sm transition-all relative overflow-hidden",
+                      isSelected
+                        ? "border-primary bg-primary/20 text-primary-foreground font-medium shadow-[0_0_15px_rgba(251,191,36,0.3)]"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    )}
+                  >
+                    {isSelected && (
+                      <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ transform: 'skewX(-20deg)' }} />
+                    )}
+                    {artist.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Language & Duration */}

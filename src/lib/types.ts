@@ -5,6 +5,14 @@ export interface Genre {
   icon: string;
 }
 
+export interface Artist {
+  id: string;
+  name: string;
+  label: string; // Display name (e.g. "Taylor Swift")
+  category: "global" | "japanese";
+  style: string; // Description for the prompt
+}
+
 export type Mood = "bright" | "dark" | "energetic" | "calm" | "melancholic" | "dreamy";
 export type Tempo = "slow" | "normal" | "fast" | "custom";
 export type Language = "ja" | "en";
@@ -18,7 +26,9 @@ export interface MusicConfig {
   themes: string[];
   customTheme: string;
   language: Language;
+  language: Language;
   duration: Duration;
+  artist?: string; // Artist ID
 }
 
 export interface GeneratedPrompt {
@@ -84,6 +94,31 @@ export const THEMES = [
   { id: "future", label: "未来", labelEn: "Future" },
 ];
 
+export const ARTISTS: Artist[] = [
+  // Global
+  { id: "taylor_swift", name: "Taylor Swift", label: "Taylor Swift", category: "global", style: "storytelling pop, country influence, catchy hooks, emotional, bridge-focused" },
+  { id: "ed_sheeran", name: "Ed Sheeran", label: "Ed Sheeran", category: "global", style: "acoustic pop, folk-pop, loop pedal style, rap-sung vocals, romantic" },
+  { id: "ariana_grande", name: "Ariana Grande", label: "Ariana Grande", category: "global", style: "pop, R&B, high vocal range, whistle notes, trap beats" },
+  { id: "bruno_mars", name: "Bruno Mars", label: "Bruno Mars", category: "global", style: "funk, soul, retro pop, energetic, groovy basslines" },
+  { id: "the_beatles", name: "The Beatles", label: "The Beatles", category: "global", style: "classic rock, pop rock, experimental, harmonious vocals" },
+  { id: "queen", name: "Queen", label: "Queen", category: "global", style: "glam rock, operatic, theatrical, anthemic, heavy guitar solos" },
+  { id: "michael_jackson", name: "Michael Jackson", label: "Michael Jackson", category: "global", style: "pop, funk, dance-pop, rhythmic breathing, strong beat" },
+  { id: "bts", name: "BTS", label: "BTS", category: "global", style: "K-pop, hip-hop, polished production, rap verses and vocal chorus" },
+  { id: "blackpink", name: "BLACKPINK", label: "BLACKPINK", category: "global", style: "K-pop, EDM trap, girl crush, bold, catchy drops" },
+  
+  // Japanese
+  { id: "yoasobi", name: "YOASOBI", label: "YOASOBI", category: "japanese", style: "J-pop, storytelling, fast piano, vocaloid-style melody, Ikura vocals" },
+  { id: "kenshi_yonezu", name: "Kenshi Yonezu", label: "米津玄師", category: "japanese", style: "J-pop, rock, experimental, unique chord progressions, poetic lyrics" },
+  { id: "official_hige_dandism", name: "Official Hige Dandism", label: "Official髭男dism", category: "japanese", style: "piano pop-rock, soulful vocals, complex arrangements, catchy chorus" },
+  { id: "ado", name: "Ado", label: "Ado", category: "japanese", style: "J-pop, rock, powerful vocals, aggressive and emotional, wide vocal range" },
+  { id: "utada_hikaru", name: "Utada Hikaru", label: "宇多田ヒカル", category: "japanese", style: "R&B, J-pop, electronic, emotional, distinctive vibrato" },
+  { id: "gen_hoshino", name: "Gen Hoshino", label: "星野源", category: "japanese", style: "pop, soul, funk, joy, everyday life themes" },
+  { id: "misia", name: "MISIA", label: "MISIA", category: "japanese", style: "R&B, soul, powerful ballad, 5-octave vocal range" },
+  { id: "x_japan", name: "X Japan", label: "X Japan", category: "japanese", style: "visual kei, heavy metal, speed metal, classical influence, piano ballads" },
+  { id: "king_gnu", name: "King Gnu", label: "King Gnu", category: "japanese", style: "mixture rock, J-pop, experimental, dual vocals, groovy" },
+  { id: "radwimps", name: "RADWIMPS", label: "RADWIMPS", category: "japanese", style: "rock, indie, emotional, philosophical lyrics, movie soundtrack style" },
+];
+
 export const DEFAULT_CONFIG: MusicConfig = {
   genres: [],
   mood: "bright",
@@ -92,5 +127,7 @@ export const DEFAULT_CONFIG: MusicConfig = {
   themes: [],
   customTheme: "",
   language: "ja",
+  language: "ja",
   duration: "2min",
+  artist: "",
 };

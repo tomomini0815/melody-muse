@@ -145,7 +145,7 @@ export default function Index() {
               <Music className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-display font-bold gradient-text">SunoAI Prompt Studio</h1>
+              <h1 className="text-lg font-display font-bold gradient-text">MusicAI Prompt Studio</h1>
               <p className="text-xs text-muted-foreground">音楽プロンプトジェネレーター</p>
             </div>
           </div>

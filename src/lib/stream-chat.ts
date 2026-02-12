@@ -9,6 +9,7 @@ export interface GenerateRequest {
   customTheme: string;
   language: string;
   duration: string;
+  artist?: string;
 }
 
 export interface GenerateResponse {
