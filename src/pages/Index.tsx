@@ -141,7 +141,14 @@ export default function Index() {
       {/* Header */}
       <header className="relative z-10 border-b border-border">
         <div className="container max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => {
+              setStep(0);
+              setResult(null);
+              setConfig({ ...DEFAULT_CONFIG });
+            }}
+          >
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl gradient-primary flex items-center justify-center shrink-0">
               <Music className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
             </div>

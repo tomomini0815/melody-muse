@@ -1,9 +1,11 @@
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { MusicConfig, MOODS, THEMES, Tempo, Language, Duration, ARTISTS } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import {
-  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User,
+  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User, Globe, Languages, Search,
 } from "lucide-react";
 
 const moodIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -30,6 +32,8 @@ interface Props {
 }
 
 export function CustomizeForm({ config, onChange }: Props) {
+  const [artistCategory, setArtistCategory] = useState<"japanese" | "global">("japanese");
+  const [searchTerm, setSearchTerm] = useState("");
   const update = (partial: Partial<MusicConfig>) => onChange({ ...config, ...partial });
 
   return (
@@ -133,71 +137,107 @@ export function CustomizeForm({ config, onChange }: Props) {
       </div>
 
       {/* Artists */}
-      <div>
-        <h3 className="text-lg font-display font-semibold mb-3">
-          <span className="flex items-center gap-2">
-            <User className="w-5 h-5 text-primary" />
-            アーティストスタイル (任意)
-          </span>
-        </h3>
-        <p className="text-sm text-muted-foreground mb-3">
-          有名なアーティストのスタイルを参考にします（※あくまでスタイル模倣です）
-        </p>
+      <div className="glass-card rounded-2xl p-6 border-primary/10 relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-50" />
 
-        <div className="space-y-4">
-          {/* Global Artists */}
-          <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Global</h4>
-            <div className="flex gap-2 flex-wrap">
-              {ARTISTS.filter(a => a.category === "global").map((artist) => {
+        <div className="relative z-10">
+          <div className="flex flex-col gap-6 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-display font-semibold flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary" />
+                  アーティストスタイル <span className="text-muted-foreground text-sm font-normal">(任意)</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  有名なアーティストのスタイルを参考にします（※あくまでスタイル模倣です）
+                </p>
+              </div>
+
+              <div className="flex p-1 bg-secondary/50 backdrop-blur-sm rounded-xl border border-border/50 self-start sm:self-center">
+                {[
+                  { id: "japanese", label: "Japanese", icon: Languages },
+                  { id: "global", label: "Global", icon: Globe },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setArtistCategory(cat.id as any)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all relative",
+                      artistCategory === cat.id
+                        ? "text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {artistCategory === cat.id && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 bg-primary rounded-lg"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    <cat.icon className="w-3.5 h-3.5 relative z-10" />
+                    <span className="relative z-10">{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="アーティストを検索..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-secondary/30 border-border/50 focus:border-primary/50 transition-colors"
+              />
+            </div>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${artistCategory}-${searchTerm}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="flex gap-2.5 flex-wrap min-h-[60px]"
+            >
+              {ARTISTS.filter(a =>
+                a.category === artistCategory &&
+                (searchTerm === "" || a.label.toLowerCase().includes(searchTerm.toLowerCase()))
+              ).map((artist) => {
                 const isSelected = config.artist === artist.id;
                 return (
                   <button
                     key={artist.id}
                     onClick={() => update({ artist: isSelected ? "" : artist.id })}
                     className={cn(
-                      "px-3 py-1.5 rounded-full border text-sm transition-all relative overflow-hidden",
+                      "px-4 py-2 rounded-xl border text-sm transition-all relative overflow-hidden group/btn",
                       isSelected
-                        ? "border-primary bg-primary/20 text-primary-foreground font-medium shadow-[0_0_15px_rgba(251,191,36,0.3)]"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                        ? "border-primary bg-primary/20 text-primary font-bold shadow-[0_0_20px_rgba(251,191,36,0.2)]"
+                        : "border-border/50 bg-card/40 backdrop-blur-md text-muted-foreground hover:border-primary/40 hover:bg-card/60 hover:text-foreground"
                     )}
                   >
                     {isSelected && (
-                      <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ transform: 'skewX(-20deg)' }} />
+                      <motion.div
+                        layoutId="selectedArtist"
+                        className="absolute inset-0 bg-primary/5"
+                        initial={false}
+                      />
                     )}
-                    {artist.label}
+                    <span className="relative z-10">{artist.label}</span>
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Japanese Artists */}
-          <div>
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Japanese</h4>
-            <div className="flex gap-2 flex-wrap">
-              {ARTISTS.filter(a => a.category === "japanese").map((artist) => {
-                const isSelected = config.artist === artist.id;
-                return (
-                  <button
-                    key={artist.id}
-                    onClick={() => update({ artist: isSelected ? "" : artist.id })}
-                    className={cn(
-                      "px-3 py-1.5 rounded-full border text-sm transition-all relative overflow-hidden",
-                      isSelected
-                        ? "border-primary bg-primary/20 text-primary-foreground font-medium shadow-[0_0_15px_rgba(251,191,36,0.3)]"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                    )}
-                  >
-                    {isSelected && (
-                      <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ transform: 'skewX(-20deg)' }} />
-                    )}
-                    {artist.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+              {ARTISTS.filter(a =>
+                a.category === artistCategory &&
+                a.label.toLowerCase().includes(searchTerm.toLowerCase())
+              ).length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 px-2 italic">一致するアーティストが見つかりません</p>
+                )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 

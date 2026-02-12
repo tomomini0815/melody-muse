@@ -281,18 +281,15 @@ export default function AudioAnalysis() {
 
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                        <Link to="/">
-                            <Button variant="ghost" size="icon" className="rounded-full hover:bg-white/10 h-9 w-9">
-                                <ArrowLeft className="w-5 h-5" />
-                            </Button>
-                        </Link>
+                    <Link to="/" className="flex items-center gap-3 sm:gap-4 hover:opacity-80 transition-opacity">
+                        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl gradient-primary flex items-center justify-center shrink-0">
+                            <Music className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+                        </div>
                         <div>
-                            <h1 className="text-xl sm:text-3xl font-display font-bold gradient-text">Audio Analysis Studio</h1>
+                            <h1 className="text-xl sm:text-3xl font-display font-bold gradient-text leading-tight">Audio Analysis Studio</h1>
                             <p className="text-xs sm:text-sm text-muted-foreground">楽曲ライブラリの音響特性を可視化します</p>
                         </div>
-                    </div>
-
+                    </Link>
                     <div className="flex justify-end gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                         {results.length > 0 && (
                             <>
