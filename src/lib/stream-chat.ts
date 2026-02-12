@@ -150,19 +150,41 @@ export async function generateCoverArt(lyrics: string, styleTags: string): Promi
   return data.imageUrl;
 }
 
-const REFINE_PROMPT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/refine-prompt`;
-
 export async function refineStyleTags(prompt: string): Promise<string> {
-  const resp = await fetch(REFINE_PROMPT_URL, {
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) throw new Error("VITE_GEMINI_API_KEY is not configured in .env");
+
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: `You are a Suno AI prompt expert. Convert the user's music description into a concise, effective comma-separated list of English style tags (max 120 characters total). Only output the tags themselves inside brackets, e.g. [upbeat pop, disco strings, energetic]. 
+
+User Description: ${prompt}`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 100,
+      }
+    }),
   });
 
-  if (!resp.ok) throw new Error("プロンプトの更新に失敗しました。");
+  if (!resp.ok) {
+    const errorData = await resp.json();
+    console.error("Gemini API error:", errorData);
+    throw new Error("プロンプトの更新に失敗しました。APIキーの設定を確認してください。");
+  }
+
   const data = await resp.json();
-  return data.refinedPrompt;
+  const refinedText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return refinedText.trim();
 }
