@@ -143,7 +143,7 @@ export function CustomizeForm({ config, onChange }: Props) {
 
         <div className="relative z-10">
           <div className="flex flex-col gap-6 mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <div>
                 <h3 className="text-lg font-display font-semibold flex items-center gap-2">
                   <User className="w-5 h-5 text-primary" />
@@ -154,63 +154,58 @@ export function CustomizeForm({ config, onChange }: Props) {
                 </p>
               </div>
 
-              <div className="flex p-1 bg-secondary/50 backdrop-blur-sm rounded-xl border border-border/50 self-start sm:self-center">
-                {[
-                  { id: "japanese", label: "Japanese", icon: Languages },
-                  { id: "global", label: "Global", icon: Globe },
-                ].map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setArtistCategory(cat.id as any)}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-medium transition-all relative",
-                      artistCategory === cat.id
-                        ? "text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {artistCategory === cat.id && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 bg-primary rounded-lg"
-                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                      />
-                    )}
-                    <cat.icon className="w-3.5 h-3.5 relative z-10" />
-                    <span className="relative z-10">{cat.label}</span>
-                  </button>
-                ))}
+              {/* Artist Category Tabs (Matching Requested Design) */}
+              <div className="inline-flex p-1.5 bg-card/40 backdrop-blur-md rounded-[32px] border border-border/50 relative overflow-hidden h-[46px]">
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-y-1.5 bg-primary rounded-[28px]"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  animate={{
+                    left: artistCategory === "japanese" ? "6px" : "calc(50% + 1px)",
+                  }}
+                  style={{
+                    width: "calc(50% - 7px)"
+                  }}
+                />
+                <button
+                  onClick={() => setArtistCategory("japanese")}
+                  className={cn(
+                    "relative z-10 px-6 py-2 flex items-center gap-2 text-sm font-medium transition-colors duration-300 rounded-[28px] min-w-[120px] justify-center",
+                    artistCategory === "japanese" ? "text-primary-foreground font-bold" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Languages className="w-4 h-4" />
+                  Japanese
+                </button>
+                <button
+                  onClick={() => setArtistCategory("global")}
+                  className={cn(
+                    "relative z-10 px-6 py-2 flex items-center gap-2 text-sm font-medium transition-colors duration-300 rounded-[28px] min-w-[120px] justify-center",
+                    artistCategory === "global" ? "text-primary-foreground font-bold" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Globe className="w-4 h-4" />
+                  Global
+                </button>
               </div>
             </div>
 
-            {/* Artist Search & Custom Input */}
-            <div className="space-y-4">
+            {/* Custom Input (Search box removed, this is the free input field) */}
+            <div className="relative group/custom w-full max-w-2xl mx-auto">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur opacity-0 group-focus-within/custom:opacity-100 transition duration-500" />
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/70" />
                 <Input
-                  placeholder="リストからアーティストを検索..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-secondary/30 border-border/50 focus:border-primary/50 transition-colors"
+                  placeholder="その他のアーティスト名・スタイルを自由入力..."
+                  value={config.customArtist}
+                  onChange={(e) => {
+                    update({
+                      customArtist: e.target.value,
+                      artist: e.target.value ? "" : config.artist
+                    });
+                  }}
+                  className="pl-10 bg-card/50 border-primary/20 focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
                 />
-              </div>
-
-              <div className="relative group/custom">
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur opacity-0 group-focus-within/custom:opacity-100 transition duration-500" />
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/70" />
-                  <Input
-                    placeholder="その他のアーティスト名・スタイルを自由入力..."
-                    value={config.customArtist}
-                    onChange={(e) => {
-                      update({
-                        customArtist: e.target.value,
-                        artist: e.target.value ? "" : config.artist
-                      });
-                    }}
-                    className="pl-10 bg-card/50 border-primary/20 focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
-                  />
-                </div>
               </div>
             </div>
           </div>
