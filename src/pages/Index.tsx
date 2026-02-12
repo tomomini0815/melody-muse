@@ -194,7 +194,7 @@ export default function Index() {
           {step === 1 && (
             <motion.div key="s1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
               <CustomizeForm config={config} onChange={setConfig} />
-              <div className="mt-8 flex justify-between">
+              <div className="mt-4 flex justify-between">
                 <Button variant="outline" onClick={() => setStep(0)}>
                   <ArrowLeft className="w-4 h-4 mr-1" /> 戻る
                 </Button>
@@ -214,13 +214,21 @@ export default function Index() {
               <ResultView
                 prompt={result}
                 isStreaming={isStreaming}
-                onUpdateLyrics={(lyrics) => setResult((p) => p ? { ...p, lyrics } : p)}
+                onUpdateLyrics={(lyrics) => {
+                  const updated = { ...result, lyrics };
+                  setResult(updated);
+                  saveToHistory(updated);
+                }}
                 onToggleFavorite={() => {
                   const newFav = toggleFavorite(result.id);
                   setResult((p) => p ? { ...p, isFavorite: newFav } : p);
                 }}
+                onUpdatePrompt={(updated) => {
+                  setResult(updated);
+                  saveToHistory(updated);
+                }}
               />
-              <div className="mt-8 flex justify-between">
+              <div className="mt-4 flex justify-between">
                 <Button variant="outline" onClick={() => setStep(1)}>
                   <ArrowLeft className="w-4 h-4 mr-1" /> 設定に戻る
                 </Button>

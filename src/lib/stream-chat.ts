@@ -126,3 +126,25 @@ export async function translateLyrics(lyrics: string, targetLang: "ja" | "en"): 
   const data = await resp.json();
   return data.translation;
 }
+
+const COVER_ART_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-cover-art`;
+
+export async function generateCoverArt(lyrics: string, styleTags: string): Promise<string> {
+  const resp = await fetch(COVER_ART_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: JSON.stringify({ lyrics, styleTags }),
+  });
+
+  if (!resp.ok) {
+    const errorBody = await resp.text().catch(() => "Unknown error");
+    console.error("Cover Art Error:", resp.status, errorBody);
+    throw new Error(`生成エラー (${resp.status}): ${errorBody.slice(0, 100)}`);
+  }
+
+  const data = await resp.json();
+  return data.imageUrl;
+}

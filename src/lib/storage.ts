@@ -14,8 +14,13 @@ export function getHistory(): GeneratedPrompt[] {
 
 export function saveToHistory(prompt: GeneratedPrompt) {
   const history = getHistory();
-  history.unshift(prompt);
-  if (history.length > 50) history.pop();
+  const existing = history.findIndex((h) => h.id === prompt.id);
+  if (existing !== -1) {
+    history[existing] = prompt;
+  } else {
+    history.unshift(prompt);
+    if (history.length > 50) history.pop();
+  }
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
 }
 

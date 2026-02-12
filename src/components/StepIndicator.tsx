@@ -14,13 +14,13 @@ export function StepIndicator({ current, isGenreSelected }: { current: number; i
         const Icon = i < current ? Check : step.icon;
         const isActive = i === current;
         const isDone = i < current;
-        // i=1 (Customize) connection from i=0 (Genre) should highlight if isDone (step > 0) OR if it's the first step connection and genre is selected
-        const isLineActive = isDone || (i === 1 && isGenreSelected);
+        // The line leading to step i should be active if we've reached step i or further
+        const isLineActive = i <= current || (i === 1 && isGenreSelected);
 
         return (
           <div key={i} className="flex items-center gap-2">
             {i > 0 && (
-              <div className={cn("h-px w-8 md:w-16 transition-colors duration-300", isLineActive ? "bg-primary" : "bg-border")} />
+              <div className={cn("h-[1.5px] w-8 md:w-16 transition-colors duration-300", isLineActive ? "bg-primary" : "bg-white/10")} />
             )}
             <div className="flex flex-col items-center gap-1">
               <div

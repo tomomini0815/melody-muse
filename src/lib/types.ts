@@ -42,6 +42,7 @@ export interface GeneratedPrompt {
   config: MusicConfig;
   createdAt: number;
   isFavorite: boolean;
+  coverUrl?: string;
 }
 
 export const GENRES: Genre[] = [

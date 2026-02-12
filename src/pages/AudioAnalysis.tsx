@@ -323,47 +323,96 @@ export default function AudioAnalysis() {
 
                 {/* Dropzone */}
                 {results.length === 0 && (
-                    <div
-                        onDragOver={onDragOver}
-                        onDragLeave={onDragLeave}
-                        onDrop={onDrop}
-                        className={cn(
-                            "glass-card rounded-3xl p-6 sm:p-12 border-2 border-dashed transition-all cursor-pointer group",
-                            isDragActive
-                                ? "border-primary bg-primary/10 scale-[0.99]"
-                                : "border-white/10 hover:border-primary/30"
-                        )}
-                        onClick={() => document.getElementById('file-upload')?.click()}
-                    >
-                        <input
-                            id="file-upload"
-                            type="file"
-                            multiple
-                            accept="audio/*"
-                            className="hidden"
-                            onChange={handleFileSelect}
-                            // @ts-ignore
-                            webkitdirectory=""
-                        />
-
-                        <div className="flex flex-col items-center gap-4 sm:gap-6 text-center">
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                {analyzing ? <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-spin" /> : <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-pulse" />}
-                            </div>
-                            <div className="space-y-2">
-                                <h2 className="text-xl sm:text-2xl font-display font-bold">
-                                    {analyzing ? `分析中... ${progress.current}/${progress.total}` : "ドロップして分析を開始"}
-                                </h2>
-                                <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto">
-                                    楽曲ファイルまたは<span className="text-primary font-bold">フォルダごと</span>ドロップしてください
-                                </p>
-                            </div>
-                            {!analyzing && (
-                                <Button className="gradient-primary h-10 sm:h-12 px-6 sm:px-8 rounded-full text-sm sm:text-base">
-                                    ファイルを選択
-                                </Button>
+                    <div className="space-y-8">
+                        <div
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                            onDrop={onDrop}
+                            className={cn(
+                                "glass-card rounded-3xl p-6 sm:p-12 border-2 border-dashed transition-all cursor-pointer group",
+                                isDragActive
+                                    ? "border-primary bg-primary/10 scale-[0.99]"
+                                    : "border-white/10 hover:border-primary/30"
                             )}
+                            onClick={() => document.getElementById('file-upload')?.click()}
+                        >
+                            <input
+                                id="file-upload"
+                                type="file"
+                                multiple
+                                accept="audio/*"
+                                className="hidden"
+                                onChange={handleFileSelect}
+                                // @ts-ignore
+                                webkitdirectory=""
+                            />
+
+                            <div className="flex flex-col items-center gap-4 sm:gap-6 text-center">
+                                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    {analyzing ? <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-spin" /> : <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-pulse" />}
+                                </div>
+                                <div className="space-y-2">
+                                    <h2 className="text-xl sm:text-2xl font-display font-bold">
+                                        {analyzing ? `分析中... ${progress.current}/${progress.total}` : "ドロップして分析を開始"}
+                                    </h2>
+                                    <p className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto">
+                                        楽曲ファイルまたは<span className="text-primary font-bold">フォルダごと</span>ドロップしてください
+                                    </p>
+                                </div>
+                                {!analyzing && (
+                                    <Button className="gradient-primary h-10 sm:h-12 px-6 sm:px-8 rounded-full text-sm sm:text-base">
+                                        ファイルを選択
+                                    </Button>
+                                )}
+                            </div>
                         </div>
+
+                        {/* Privacy Notice */}
+                        {!analyzing && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                                className="glass rounded-2xl p-6 sm:p-8 space-y-4 border-white/5 bg-black/20"
+                            >
+                                <div className="flex items-center gap-2 text-primary">
+                                    <Info className="w-5 h-5 flex-shrink-0" />
+                                    <h3 className="font-bold text-sm sm:text-[15px]">プライバシーとセキュリティについて</h3>
+                                </div>
+                                <p className="text-xs sm:text-sm text-foreground/80 leading-relaxed">
+                                    アップロードされた音楽ファイルそのものが、サーバーに保存されることは一切ありません。
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center gap-2 text-primary/80">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">ブラウザ内完結</span>
+                                        </div>
+                                        <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                                            ファイルはあなたのPC上のブラウザ内だけで読み込まれ、解析（Web Audio APIを使用）されます。
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center gap-2 text-primary/80">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">外部送信なし</span>
+                                        </div>
+                                        <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                                            音楽データがインターネットを通じて外部サーバーに送信されることはありません。
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center gap-2 text-primary/80">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">保存されるもの</span>
+                                        </div>
+                                        <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                                            書き出しボタンを押した際、解析数値データ（曲名、BPM等）のみがあなたのPCに保存されます。
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
                     </div>
                 )}
 
