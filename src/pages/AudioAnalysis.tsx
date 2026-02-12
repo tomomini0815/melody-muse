@@ -293,7 +293,17 @@ export default function AudioAnalysis() {
                         </div>
                     </div>
 
-                    <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                    <div className="flex justify-end gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                        {results.length > 0 && (
+                            <>
+                                <Button onClick={handleExportCSV} variant="outline" className="border-primary/30 hover:bg-primary/5 gap-2">
+                                    <Download className="w-4 h-4" /> CSV書き出し
+                                </Button>
+                                <Button onClick={handleExport} variant="outline" className="border-primary/50 hover:bg-primary/10 gap-2">
+                                    <Download className="w-4 h-4" /> JSON書き出し
+                                </Button>
+                            </>
+                        )}
                         <input
                             type="file"
                             id="import-json"
@@ -308,17 +318,6 @@ export default function AudioAnalysis() {
                         >
                             <Upload className="w-4 h-4" /> インポート (JSON)
                         </Button>
-
-                        {results.length > 0 && (
-                            <>
-                                <Button onClick={handleExportCSV} variant="outline" className="border-primary/30 hover:bg-primary/5 gap-2">
-                                    <Download className="w-4 h-4" /> CSV書き出し
-                                </Button>
-                                <Button onClick={handleExport} variant="outline" className="border-primary/50 hover:bg-primary/10 gap-2">
-                                    <Download className="w-4 h-4" /> JSON書き出し
-                                </Button>
-                            </>
-                        )}
                     </div>
                 </div>
 
@@ -375,46 +374,66 @@ export default function AudioAnalysis() {
                         {/* Chart Section */}
                         <Card className="glass-card border-white/5 overflow-hidden">
                             <CardHeader className="p-4 sm:p-6 pb-2">
-                                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                                    楽曲特性マップ (Sonic Landscape)
-                                </CardTitle>
+                                <div className="space-y-4">
+                                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                                        楽曲特性マップ (Sonic Landscape)
+                                    </CardTitle>
+
+                                    {/* Custom Legend moved to header for better mobile layout */}
+                                    <div className="flex flex-wrap gap-x-4 gap-y-2 px-1">
+                                        {Object.keys(groupedResults).map((clusterKey) => {
+                                            const index = parseInt(clusterKey);
+                                            return (
+                                                <div key={index} className="flex items-center gap-1.5 min-w-fit">
+                                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: CLUSTER_COLORS[index % CLUSTER_COLORS.length] }} />
+                                                    <span
+                                                        className="text-[10px] sm:text-xs font-medium whitespace-nowrap"
+                                                        style={{ color: CLUSTER_COLORS[index % CLUSTER_COLORS.length] }}
+                                                    >
+                                                        {CLUSTER_NAMES_JA[index]}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </CardHeader>
                             <CardContent className="p-2 sm:p-6 pt-0">
-                                <div className="h-[350px] sm:h-[500px] md:h-[600px] w-full relative">
+                                <div className="h-[400px] sm:h-[500px] md:h-[600px] w-full relative">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 30 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} />
+                                        <ScatterChart margin={{ top: 10, right: 10, bottom: 20, left: -20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.3} vertical={false} />
 
                                             <XAxis
                                                 type="number" dataKey="brightness" name="Brightness" unit="%"
-                                                label={{ value: 'Brightness (Timbre)', position: 'bottom', fill: '#666', offset: 0 }}
-                                                stroke="#555" domain={[0, 100]} tick={{ fill: '#666' }}
+                                                label={{ value: 'Brightness (%)', position: 'insideBottomRight', fill: '#666', offset: -5, fontSize: 10, opacity: 0.6 }}
+                                                stroke="#444" domain={[0, 100]} tick={{ fill: '#666', fontSize: 10 }}
                                             />
                                             <YAxis
                                                 type="number" dataKey="energy" name="Energy" unit="%"
-                                                label={{ value: 'Energy (Intensity)', angle: -90, position: 'insideLeft', fill: '#666' }}
-                                                stroke="#555" domain={[0, 100]} tick={{ fill: '#666' }}
+                                                label={{ value: 'Energy (%)', angle: -90, position: 'insideTopLeft', fill: '#666', fontSize: 10, opacity: 0.6 }}
+                                                stroke="#444" domain={[0, 100]} tick={{ fill: '#666', fontSize: 10 }}
                                             />
-                                            <ZAxis type="number" dataKey="size" range={[50, 400]} />
+                                            <ZAxis type="number" dataKey="size" range={[60, 400]} />
 
-                                            <ReferenceLine x={50} stroke="#444" strokeDasharray="3 3" />
-                                            <ReferenceLine y={50} stroke="#444" strokeDasharray="3 3" />
+                                            <ReferenceLine x={50} stroke="#333" strokeDasharray="3 3" />
+                                            <ReferenceLine y={50} stroke="#333" strokeDasharray="3 3" />
 
-                                            <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Bright", position: 'insideTopRight', fill: '#4ade80', fontSize: 12, opacity: 0.5 }} />
-                                            <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Dark", position: 'insideTopLeft', fill: '#ff4b4b', fontSize: 12, opacity: 0.5 }} />
-                                            <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Bright", position: 'insideBottomRight', fill: '#00d4ff', fontSize: 12, opacity: 0.5 }} />
-                                            <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Dark", position: 'insideBottomLeft', fill: '#a855f7', fontSize: 12, opacity: 0.5 }} />
+                                            <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Bright", position: 'insideTopRight', fill: '#4ade80', fontSize: 10, opacity: 0.3 }} />
+                                            <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="transparent" stroke="none" label={{ value: "Energetic & Dark", position: 'insideTopLeft', fill: '#ff4b4b', fontSize: 10, opacity: 0.3 }} />
+                                            <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Bright", position: 'insideBottomRight', fill: '#00d4ff', fontSize: 10, opacity: 0.3 }} />
+                                            <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="transparent" stroke="none" label={{ value: "Calm & Dark", position: 'insideBottomLeft', fill: '#a855f7', fontSize: 10, opacity: 0.3 }} />
 
                                             <Tooltip
-                                                cursor={{ strokeDasharray: '3 3' }}
+                                                cursor={{ strokeDasharray: '3 3', stroke: '#ff4d4d' }}
                                                 content={({ active, payload }) => {
                                                     if (active && payload && payload.length) {
                                                         const data = payload[0].payload as AudioFeatures;
                                                         return (
-                                                            <div className="glass p-4 rounded-xl border border-white/10 bg-black/90 shadow-xl">
-                                                                <p className="font-bold text-primary mb-2 text-sm">{data.name}</p>
-                                                                <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-zinc-400">
+                                                            <div className="glass p-3 rounded-xl border border-white/10 bg-black/90 shadow-xl max-w-[180px]">
+                                                                <p className="font-bold text-primary mb-1 text-[11px] truncate">{data.name}</p>
+                                                                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] text-zinc-400">
                                                                     <span>Tempo:</span> <span className="text-white">~{Math.round(data.tempo)} BPM</span>
                                                                     <span>Bright:</span> <span className="text-white">{Math.round(data.brightness)}%</span>
                                                                     <span>Energy:</span> <span className="text-white">{Math.round(data.energy)}%</span>
@@ -425,17 +444,17 @@ export default function AudioAnalysis() {
                                                     return null;
                                                 }}
                                             />
-                                            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ paddingBottom: '20px' }} />
 
                                             {Object.keys(groupedResults).map((clusterKey) => {
                                                 const index = parseInt(clusterKey);
                                                 return (
                                                     <Scatter
                                                         key={index}
-                                                        name={CLUSTER_NAMES[index] || `Cluster ${index + 1}`}
                                                         data={groupedResults[index]}
                                                         fill={CLUSTER_COLORS[index % CLUSTER_COLORS.length]}
                                                         fillOpacity={0.8}
+                                                        animationDuration={1000}
+                                                        animationEasing="ease-out"
                                                     />
                                                 );
                                             })}

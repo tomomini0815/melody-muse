@@ -230,6 +230,111 @@ export const ARTISTS: Artist[] = [
     category: "japanese",
     style: "Vocal: Noda's emotional, boys-like candid vocals. Atmosphere: Alternative rock, intricate guitar interplay, philosophical and romantic lyrics, dynamic range from quiet verses to explosive choruses, 'Shinkai' movie vibe."
   },
+  {
+    id: "fujii_kaze",
+    name: "Fujii Kaze",
+    label: "藤井風",
+    category: "japanese",
+    style: "Vocal: Smooth, soulful, R&B-influenced vocals with Okayama dialect. Atmosphere: Free-spirited, blend of R&B, Jazz, and deeply spiritual/philosophical Japanese Pop. Piano-driven, groovy yet relaxed."
+  },
+  {
+    id: "mrs_green_apple",
+    name: "Mrs. GREEN APPLE",
+    label: "Mrs. GREEN APPLE",
+    category: "japanese",
+    style: "Vocal: Motoki's incredibly high, bright, and powerful range. Atmosphere: colorful, sparkling Pop-Rock, complex arrangements with EDM elements, catchy and uplifting melodies, youthful energy."
+  },
+  {
+    id: "shiina_ringo",
+    name: "Shiina Ringo",
+    label: "椎名林檎",
+    category: "japanese",
+    style: "Vocal: Expressive, theatrical, sometimes distorted or whispered (Makizita). Atmosphere: Avant-garde Pop/Rock, heavy Jazz and Showa Kayo influences, complex chords, orchestral hits, edgy and sophisticated."
+  },
+  {
+    id: "perfume",
+    name: "Perfume",
+    label: "Perfume",
+    category: "japanese",
+    style: "Vocal: Auto-tuned, unison female vocals, mechanic yet cute. Atmosphere: Futuristic Technopop (Nakata Yasutaka sound), heavy side-chain compression, electronic dance beats, geometric and polished."
+  },
+  {
+    id: "tatsuro_yamashita",
+    name: "Tatsuro Yamashita",
+    label: "山下達郎",
+    category: "japanese",
+    style: "Vocal: Smooth multi-layered doo-wop harmonies, rich mid-range. Atmosphere: King of City Pop, summer vibe, sophisticated funk/soul arrangements, sparkling guitar cutting, 80s resort feeling."
+  },
+  {
+    id: "vaundy",
+    name: "Vaundy",
+    label: "Vaundy",
+    category: "japanese",
+    style: "Vocal: Versatile, from lazy low-fi to powerful rock shouting. Atmosphere: Genre-blending genius (Rock, Hip-hop, R&B, EDM), catchy loops, modern Tokyo vibe, stylish and highly produced sound."
+  },
+  {
+    id: "lisa",
+    name: "LiSA",
+    label: "LiSA",
+    category: "japanese",
+    style: "Vocal: Piercing, powerful rock heroine voice, emotional vibrato. Atmosphere: High-speed Anime song style, heavy rock instrumentation mixed with pop melodies, dramatic, hopeful and driving."
+  },
+  {
+    id: "spitz",
+    name: "Spitz",
+    label: "スピッツ",
+    category: "japanese",
+    style: "Vocal: Masamune's clear, high, evergreen boyish voice. Atmosphere: Jangle-pop, arpeggio guitars, nostalgic melodies, pure and refreshing world view, timeless folk-rock essence."
+  },
+  {
+    id: "sakanaction",
+    name: "Sakanaction",
+    label: "サカナクション",
+    category: "japanese",
+    style: "Vocal: Yamaguchi's folk-influenced literary vocals. Atmosphere: Fusion of Alternative Rock and Club Music/Techno. Four-on-the-floor beats, choir choruses, night-swimming vibe, artistic and danceable."
+  },
+  {
+    id: "bump_of_chicken",
+    name: "BUMP OF CHICKEN",
+    label: "BUMP OF CHICKEN",
+    category: "japanese",
+    style: "Vocal: Fujiwara's storytelling, honest and slightly raspy voice. Atmosphere: Story-driven Guitar Rock, spacey/cosmic themes, emotional swells, anthem-like choruses, 'songs for the weak'."
+  },
+  {
+    id: "zutomayo",
+    name: "ZUTOMAYO",
+    label: "ずっと真夜中でいいのに。",
+    category: "japanese",
+    style: "Vocal: ACA-ne's expressive high-tone vocals with sudden shifts to falsetto. Atmosphere: Highly complex arrangements, funky basslines, math-rock influence, dark yet catchy J-pop, frequent use of slap bass and sophisticated rhythmic play."
+  },
+  {
+    id: "eve",
+    name: "Eve",
+    label: "Eve",
+    category: "japanese",
+    style: "Vocal: Melancholic, boyish, and emotive vocal style. Atmosphere: Fast-paced guitar rock with electronic nuances, dark fantasy themes, catchy melodies with a slight alternative edge, 'Utaite' culture influence."
+  },
+  {
+    id: "one_ok_rock",
+    name: "ONE OK ROCK",
+    label: "ONE OK ROCK",
+    category: "japanese",
+    style: "Vocal: Taka's world-class, rasp-tinted powerful vocals and perfect English. Atmosphere: Energetic Arena Rock, blend of Emo and Post-Hardcore elements with polished Pop-Rock production, driving and anthemic."
+  },
+  {
+    id: "milet",
+    name: "milet",
+    label: "milet",
+    category: "japanese",
+    style: "Vocal: Deep, husky, and gravelly low-to-mid range with elegant high notes. Atmosphere: Cinematic Pop, rich orchestral textures mixed with modern electronic production, sophisticated and ethereal vibe."
+  },
+  {
+    id: "back_number",
+    name: "back number",
+    label: "back number",
+    category: "japanese",
+    style: "Vocal: Iyori Shimizu's candid, slightly nasal yet deeply emotional voice. Atmosphere: Heartfelt guitar-pop, sentimental and honest lyrics, beautifully crafted melodies, standard but high-quality J-pop structure."
+  }
 ];
 
 export const DEFAULT_CONFIG: MusicConfig = {
