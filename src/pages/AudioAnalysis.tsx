@@ -195,6 +195,39 @@ export default function AudioAnalysis() {
         toast({ title: "エクスポート完了", description: "分析結果をJSONファイルとして保存しました。" });
     };
 
+    const handleExportCSV = () => {
+        if (results.length === 0) return;
+
+        // CSV Header
+        const headers = ["ファイル名", "テンポ (BPM)", "明るさ (%)", "エネルギー (%)", "長さ (秒)", "クラスターID", "クラスター名"];
+
+        // CSV Rows
+        const rows = results.map(r => [
+            `"${r.name}"`,
+            r.tempo,
+            r.brightness,
+            r.energy,
+            r.duration.toFixed(2),
+            r.cluster,
+            `"${CLUSTER_NAMES_JA[r.cluster || 0]}"`
+        ]);
+
+        const csvContent = [headers.join(","), ...rows.map(row => row.join(","))].join("\n");
+
+        // Build blob with BOM for UTF-8 (to prevent Excel garbling)
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "music_analysis_results.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast({ title: "CSV出力完了", description: "Spreadsheet形式で保存しました。" });
+    };
+
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -262,9 +295,14 @@ export default function AudioAnalysis() {
                         </Button>
 
                         {results.length > 0 && (
-                            <Button onClick={handleExport} variant="outline" className="border-primary/50 hover:bg-primary/10 gap-2">
-                                <Download className="w-4 h-4" /> 書き出し (JSON)
-                            </Button>
+                            <>
+                                <Button onClick={handleExportCSV} variant="outline" className="border-primary/30 hover:bg-primary/5 gap-2">
+                                    <Download className="w-4 h-4" /> CSV書き出し
+                                </Button>
+                                <Button onClick={handleExport} variant="outline" className="border-primary/50 hover:bg-primary/10 gap-2">
+                                    <Download className="w-4 h-4" /> JSON書き出し
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>
