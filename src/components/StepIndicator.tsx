@@ -7,17 +7,20 @@ const steps = [
   { label: "生成", icon: Sparkles },
 ];
 
-export function StepIndicator({ current }: { current: number }) {
+export function StepIndicator({ current, isGenreSelected }: { current: number; isGenreSelected?: boolean }) {
   return (
     <div className="flex items-center justify-center gap-2 mb-8">
       {steps.map((step, i) => {
         const Icon = i < current ? Check : step.icon;
         const isActive = i === current;
         const isDone = i < current;
+        // i=1 (Customize) connection from i=0 (Genre) should highlight if isDone (step > 0) OR if it's the first step connection and genre is selected
+        const isLineActive = isDone || (i === 1 && isGenreSelected);
+
         return (
           <div key={i} className="flex items-center gap-2">
             {i > 0 && (
-              <div className={cn("h-px w-8 md:w-16", isDone ? "bg-primary" : "bg-border")} />
+              <div className={cn("h-px w-8 md:w-16 transition-colors duration-300", isLineActive ? "bg-primary" : "bg-border")} />
             )}
             <div className="flex flex-col items-center gap-1">
               <div

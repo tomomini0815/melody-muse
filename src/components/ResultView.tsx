@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Check, Languages, Star } from "lucide-react";
+import { Copy, Check, Languages, Star, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { GeneratedPrompt } from "@/lib/types";
@@ -44,6 +44,14 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     }
   };
 
+
+  const handleOpenSuno = async () => {
+    const full = `Style Tags: ${prompt.styleTags}\n\n[Lyrics]\n${prompt.lyrics}`;
+    await navigator.clipboard.writeText(full);
+    toast({ title: "プロンプトをコピーしてSuno AIを開きます" });
+    window.open("https://suno.com/create", "_blank");
+  };
+
   const CopyBtn = ({ text, label }: { text: string; label: string }) => (
     <Button variant="ghost" size="icon" onClick={() => copyText(text, label)} className="h-8 w-8">
       {copied === label ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
@@ -68,6 +76,9 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
           </Button>
           <Button size="sm" onClick={copyAll} className="gradient-primary">
             <Copy className="w-4 h-4 mr-1" /> 一括コピー
+          </Button>
+          <Button size="sm" onClick={handleOpenSuno} className="bg-black hover:bg-zinc-800 text-white border border-zinc-700">
+            <ExternalLink className="w-4 h-4 mr-1" /> Sunoで作る
           </Button>
         </div>
       </div>

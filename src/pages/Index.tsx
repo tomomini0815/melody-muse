@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Music, Shuffle, ArrowLeft, ArrowRight, Clock, Sparkles } from "lucide-react";
+import { Music, Shuffle, ArrowLeft, ArrowRight, Clock, Sparkles, AudioWaveform } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { StepIndicator } from "@/components/StepIndicator";
@@ -150,6 +151,11 @@ export default function Index() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Link to="/analysis">
+              <Button variant="ghost" size="sm">
+                <AudioWaveform className="w-4 h-4 mr-1" /> 分析スタジオ
+              </Button>
+            </Link>
             <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating}>
               <Shuffle className="w-4 h-4 mr-1" /> ランダム
             </Button>
@@ -162,7 +168,7 @@ export default function Index() {
 
       {/* Main */}
       <main className="relative z-10 container max-w-4xl mx-auto px-4 py-8">
-        <StepIndicator current={step} />
+        <StepIndicator current={step} isGenreSelected={config.genres.length > 0} />
 
         <AnimatePresence mode="wait">
           {step === 0 && (

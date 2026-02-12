@@ -48,7 +48,7 @@ Rules:
 - List specific instruments that would suit the genre/mood combination`;
 
     const userPrompt = `Create a song with these specifications:
-    ${artist ? `- Style/Artist Influence: Similar to ${artist} (mimic their typical musical style, vocal phrasing, and lyrical themes)` : ""}
+    ${artist ? `- Style/Artist Influence: **${artist}**\n  - **CRITICAL**: The generated "Style Tags" and "Lyrcis" MUST reflect the specific **Vocal Characteristics** and **Atmosphere** defined in the prompt. Use exact musical terms (e.g. "whistle register", "vocal fry", "falsetto") in the style tags.\n  - **Vocal Target**: ${artist === 'ado' ? "Powerful, growling, theatrical, changing tone rapidly." : artist === 'yoasobi' ? "Crystal clear, flat (non-vibrato), rapid rhythmic popping." : "Mimic the specific vocal texture described in the style definition."}` : ""}
 - Genres: ${genres.join(", ")}
 - Mood: ${mood}
 - Tempo: ${tempo === "custom" ? `${bpm} BPM` : tempo}
