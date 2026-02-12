@@ -25,6 +25,7 @@ export interface MusicConfig {
   bpm: number;
   themes: string[];
   customTheme: string;
+  customArtist: string;
   language: Language;
   duration: Duration;
   artist?: string; // Artist ID
@@ -345,6 +346,7 @@ export const DEFAULT_CONFIG: MusicConfig = {
   bpm: 120,
   themes: [],
   customTheme: "",
+  customArtist: "",
   language: "ja",
   duration: "2min",
   artist: "",

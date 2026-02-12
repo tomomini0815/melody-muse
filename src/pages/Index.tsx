@@ -11,7 +11,7 @@ import { ResultView } from "@/components/ResultView";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Equalizer } from "@/components/Equalizer";
 import {
-  MusicConfig, GeneratedPrompt, DEFAULT_CONFIG, GENRES, MOODS, THEMES,
+  MusicConfig, GeneratedPrompt, DEFAULT_CONFIG, GENRES, MOODS, THEMES, ARTISTS
 } from "@/lib/types";
 import { generateLyrics } from "@/lib/stream-chat";
 import { saveToHistory, toggleFavorite } from "@/lib/storage";
@@ -37,13 +37,14 @@ export default function Index() {
       bpm,
       themes: rThemes,
       customTheme: "",
+      customArtist: "",
       language: Math.random() > 0.5 ? "ja" : "en",
       duration: (["30s", "1min", "2min", "3min+"] as const)[Math.floor(Math.random() * 4)],
     });
     setStep(2);
     handleGenerate({
       genres: rGenres, mood: rMood, tempo: "custom", bpm,
-      themes: rThemes, customTheme: "", language: Math.random() > 0.5 ? "ja" : "en",
+      themes: rThemes, customTheme: "", customArtist: "", language: Math.random() > 0.5 ? "ja" : "en",
       duration: (["30s", "1min", "2min", "3min+"] as const)[Math.floor(Math.random() * 4)],
     });
   };
@@ -71,6 +72,10 @@ export default function Index() {
     setResult(newPrompt);
 
     try {
+      const artistStyle = c.customArtist
+        ? c.customArtist
+        : (c.artist ? ARTISTS.find(a => a.id === c.artist)?.style || "" : "");
+
       const fullText = await generateLyrics(
         {
           genres: c.genres,
@@ -79,8 +84,10 @@ export default function Index() {
           bpm: c.bpm,
           themes: c.themes,
           customTheme: c.customTheme,
+          customArtist: c.customArtist,
           language: c.language,
           duration: c.duration,
+          artist: artistStyle,
         },
         (delta) => {
           setResult((prev) => prev ? { ...prev, lyrics: prev.lyrics + delta } : prev);

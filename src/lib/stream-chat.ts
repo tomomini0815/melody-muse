@@ -7,6 +7,7 @@ export interface GenerateRequest {
   bpm: number;
   themes: string[];
   customTheme: string;
+  customArtist: string;
   language: string;
   duration: string;
   artist?: string;

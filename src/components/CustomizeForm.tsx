@@ -182,15 +182,35 @@ export function CustomizeForm({ config, onChange }: Props) {
               </div>
             </div>
 
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="アーティストを検索..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-secondary/30 border-border/50 focus:border-primary/50 transition-colors"
-              />
+            {/* Artist Search & Custom Input */}
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="リストからアーティストを検索..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-secondary/30 border-border/50 focus:border-primary/50 transition-colors"
+                />
+              </div>
+
+              <div className="relative group/custom">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-accent/20 rounded-xl blur opacity-0 group-focus-within/custom:opacity-100 transition duration-500" />
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/70" />
+                  <Input
+                    placeholder="その他のアーティスト名・スタイルを自由入力..."
+                    value={config.customArtist}
+                    onChange={(e) => {
+                      update({
+                        customArtist: e.target.value,
+                        artist: e.target.value ? "" : config.artist
+                      });
+                    }}
+                    className="pl-10 bg-card/50 border-primary/20 focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -211,7 +231,10 @@ export function CustomizeForm({ config, onChange }: Props) {
                 return (
                   <button
                     key={artist.id}
-                    onClick={() => update({ artist: isSelected ? "" : artist.id })}
+                    onClick={() => update({
+                      artist: isSelected ? "" : artist.id,
+                      customArtist: ""
+                    })}
                     className={cn(
                       "px-4 py-2 rounded-xl border text-sm transition-all relative overflow-hidden group/btn",
                       isSelected
