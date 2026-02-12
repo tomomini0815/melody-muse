@@ -3,9 +3,9 @@ export interface AudioFeatures {
     name: string;
     size: number;
     duration: number;
-    brightness: number; // Spectral Centroid
+    brightness: number; // Spectral Centroid (ZCR Proxy)
     energy: number;     // RMS
-    tempo: number;      // BPM (Approximation)
+    tempo: number;      // BPM (Peak Density)
     cluster?: number;
 }
 
@@ -19,104 +19,86 @@ const getAudioContext = () => {
     return sharedAudioContext;
 };
 
+/**
+ * Polished Simple Audio Analysis
+ * Based on user preference for the "feel" of initial results.
+ */
 export const analyzeAudioFile = async (file: File): Promise<AudioFeatures> => {
-    if (file.size === 0) {
-        throw new Error("File is empty (0 bytes)");
-    }
+    if (file.size === 0) throw new Error("File is empty");
 
     const arrayBuffer = await file.arrayBuffer();
     const audioContext = getAudioContext();
 
-    let audioBuffer: AudioBuffer;
-    try {
-        // Use the shared context for decoding. 
-        // Note: decodeAudioData might still fail on some browsers if context is suspended.
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-        }
-        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    } catch (e) {
-        throw new Error(`Failed to decode audio data. The file might be corrupt or the format is unsupported by your browser. Error: ${(e as Error).message}`);
-    }
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
     const channelData = audioBuffer.getChannelData(0); // Use first channel
     const sampleRate = audioBuffer.sampleRate;
+    const duration = audioBuffer.duration;
 
-    // 1. RMS Energy (Loudness/Energy)
+    // 1. RMS Energy (Polished normalization for better contrast)
     let sumSquares = 0;
-    for (let i = 0; i < channelData.length; i++) {
+    const step = Math.max(1, Math.floor(channelData.length / 20000)); // Sample 20k points for speed
+    let count = 0;
+    for (let i = 0; i < channelData.length; i += step) {
         sumSquares += channelData[i] * channelData[i];
+        count++;
     }
-    const rms = Math.sqrt(sumSquares / channelData.length);
-    const energy = Math.min(100, Math.max(0, (Math.log10(rms) * 20 + 60) * 1.6)); // Normalize roughly 0-100
+    const rms = Math.sqrt(sumSquares / count);
+    // Emotional scaling: Push typical mastered music (0.12 - 0.25 RMS) to fill 10% - 90%
+    // This makes "relatively quiet" tracks feel "Calm" in the context of a library.
+    const energy = Math.min(100, Math.max(0, (rms - 0.08) * 650 + 20));
 
-    // 2. Spectral Centroid (Brightness) - Simplified approximation
-    // FFT is expensive on full track, so we take chunks
-    const fftSize = 2048;
-    const numChunks = 50; // Analyze 50 chunks distributed across the track
-    const chunkSize = Math.floor(channelData.length / numChunks);
+    // 2. Brightness (Zero Crossing Rate weighted by Energy)
+    // High ZCR = high frequency content / noise / brightness
+    // High contrast scaling for ZCR: 0.02 -> 0%, 0.12 -> 100%
+    let zeroCrossings = 0;
+    const zcrWindow = 1024;
+    let zcrFrames = 0;
 
-    let totalCentroid = 0;
-    let validChunks = 0;
+    // Analyze chunks distributed across the track
+    const numZcrChunks = 60;
+    const zcrHop = Math.floor(channelData.length / numZcrChunks);
 
-    for (let i = 0; i < numChunks; i++) {
-        const start = i * chunkSize;
-        const chunk = channelData.slice(start, start + fftSize);
-        if (chunk.length < fftSize) continue;
+    for (let i = 0; i < numZcrChunks; i++) {
+        const start = i * zcrHop;
+        if (start + zcrWindow > channelData.length) break;
 
-        const real = new Float32Array(chunk);
-        const imag = new Float32Array(fftSize);
-        // Simple windowing (Hanning)
-        for (let j = 0; j < fftSize; j++) {
-            real[j] *= 0.5 * (1 - Math.cos(2 * Math.PI * j / (fftSize - 1)));
-        }
-
-        // Note: Implementing a full FFT requires a library or complex code.
-        // For a lightweight solution without extra deps, we'll use Zero Crossing Rate as a proxy for "Brightness/High Frequency Content"
-        // OR we can use the Web Audio API AnalyserNode if we actually played it, but we want offline analysis.
-        // Let's stick to Zero Crossing Rate (ZCR) as a crude proxy for brightness/noisiness for now to avoid massive FFT implementation.
-
-        let zeroCrossings = 0;
-        for (let j = 1; j < chunk.length; j++) {
-            if ((chunk[j] >= 0 && chunk[j - 1] < 0) || (chunk[j] < 0 && chunk[j - 1] >= 0)) {
+        for (let j = start + 1; j < start + zcrWindow; j++) {
+            if ((channelData[j] >= 0 && channelData[j - 1] < 0) || (channelData[j] < 0 && channelData[j - 1] >= 0)) {
                 zeroCrossings++;
             }
         }
-        totalCentroid += zeroCrossings;
-        validChunks++;
+        zcrFrames++;
     }
 
-    // Normalize ZCR to 0-100 brightness scale (approx)
-    // Max ZCR per chunk (2048 samples) is 1024. Typical music is much lower.
-    const avgZCR = validChunks > 0 ? totalCentroid / validChunks : 0;
-    const brightness = Math.min(100, (avgZCR / (fftSize / 4)) * 100 * 3); // Scaling factor
+    const avgZCR = zcrFrames > 0 ? zeroCrossings / (zcrFrames * zcrWindow) : 0;
+    const brightness = Math.min(100, Math.max(0, (avgZCR - 0.02) * 1000));
 
-    // 3. Tempo (BPM) - Very crude peak detection on energy
-    // Proper BPM detection is hard. We ll generate a "Tempo Index" based on energy variance.
-    // High variance = punchy/rhythmic. Low variance = drone/ambient.
-    // NOT ACTUAL BPM, but "Rhythmic Intensitiy" mapped to 60-180 range
-    const hop = 1024;
-    let energyPeaks = 0;
-    let prevEnergy = 0;
-    for (let i = 0; i < channelData.length; i += hop) {
-        let localsum = 0;
-        for (let j = 0; j < hop && i + j < channelData.length; j++) {
-            localsum += channelData[i + j] * channelData[i + j];
+    // 3. Tempo (Refined peak density)
+    // Count "beats" where energy jumps significantly
+    const peakHop = 2048;
+    let peaks = 0;
+    let prevE = 0;
+    for (let i = 0; i < channelData.length; i += peakHop) {
+        let localSum = 0;
+        const limit = Math.min(i + peakHop, channelData.length);
+        for (let j = i; j < limit; j++) localSum += channelData[j] * channelData[j];
+        const localE = Math.sqrt(localSum / (limit - i));
+
+        if (localE > prevE * 1.6 && localE > 0.04) {
+            peaks++;
         }
-        const localRms = Math.sqrt(localsum / hop);
-        if (localRms > prevEnergy * 1.5 && localRms > 0.05) {
-            energyPeaks++;
-        }
-        prevEnergy = localRms;
+        prevE = localE;
     }
-    const durationSeconds = audioBuffer.duration;
-    const density = energyPeaks / durationSeconds;
-    const tempo = Math.min(180, Math.max(60, 60 + density * 5));
+    const density = peaks / duration;
+    // Map density to a plausible BPM range (60-180)
+    const tempo = Math.min(180, Math.max(60, 70 + density * 12));
 
     return {
         name: file.name,
         size: file.size,
-        duration: audioBuffer.duration,
+        duration: duration,
         energy: parseFloat(energy.toFixed(1)),
         brightness: parseFloat(brightness.toFixed(1)),
         tempo: Math.floor(tempo),
@@ -126,34 +108,29 @@ export const analyzeAudioFile = async (file: File): Promise<AudioFeatures> => {
 export const performClustering = (items: AudioFeatures[], k: number = 3): AudioFeatures[] => {
     if (items.length < k) return items.map(i => ({ ...i, cluster: 0 }));
 
-    // Initialize centroids naturally from data points
+    // Simple 2D K-Means (Energy vs Brightness) - user preferred the original "feel"
     let centroids = items.slice(0, k).map(i => ({ e: i.energy, b: i.brightness }));
 
-    // Simple K-Means (5 iterations is usually enough for simple 2D data)
     for (let iter = 0; iter < 10; iter++) {
-        // Assign clusters
         items.forEach(item => {
             let minDist = Infinity;
-            let clusterIndex = 0;
+            let clusterIdx = 0;
             centroids.forEach((c, idx) => {
                 const dist = Math.sqrt(Math.pow(item.energy - c.e, 2) + Math.pow(item.brightness - c.b, 2));
-                if (dist < minDist) {
-                    minDist = dist;
-                    clusterIndex = idx;
-                }
+                if (dist < minDist) { minDist = dist; clusterIdx = idx; }
             });
-            item.cluster = clusterIndex;
+            item.cluster = clusterIdx;
         });
 
-        // Update centroids
         centroids = centroids.map((_, idx) => {
-            const clusterItems = items.filter(i => i.cluster === idx);
-            if (clusterItems.length === 0) return centroids[idx]; // Keep old if empty
-            const avgE = clusterItems.reduce((sum, i) => sum + i.energy, 0) / clusterItems.length;
-            const avgB = clusterItems.reduce((sum, i) => sum + i.brightness, 0) / clusterItems.length;
-            return { e: avgE, b: avgB };
+            const cItems = items.filter(i => i.cluster === idx);
+            if (cItems.length === 0) return centroids[idx];
+            return {
+                e: cItems.reduce((s, i) => s + i.energy, 0) / cItems.length,
+                b: cItems.reduce((s, i) => s + i.brightness, 0) / cItems.length
+            };
         });
     }
-
     return items;
 };
+

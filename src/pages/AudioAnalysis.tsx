@@ -8,11 +8,12 @@ import {
 import { motion } from "framer-motion";
 import { analyzeAudioFile, AudioFeatures, performClustering } from "@/lib/audio-analysis";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Music, Upload, Info, Download } from "lucide-react";
+import { ArrowLeft, Loader2, Music, Upload, Info, Download, Sparkles, Copy, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const CLUSTER_COLORS = ["#FFD700", "#00d4ff", "#ff4b4b", "#4ade80", "#a855f7"];
 // English names for internal/display
@@ -260,6 +261,19 @@ export default function AudioAnalysis() {
         return groups;
     }, [results]);
 
+    const generateSunoPrompt = (file: AudioFeatures) => {
+        const tempoType = file.tempo > 120 ? "Fast" : file.tempo > 85 ? "Mid-tempo" : "Slow";
+        const brightnessType = file.brightness > 70 ? "Bright, Sparkling" : file.brightness > 40 ? "Balanced" : "Warm, Mellow";
+        const energyType = file.energy > 70 ? "Intense, High-energy" : file.energy > 40 ? "Moderate" : "Calm, Soft";
+
+        return `${tempoType}, ${energyType}, ${brightnessType}, ${Math.round(file.tempo)} BPM, high quality audio`;
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast({ title: "コピーしました", description: "プロンプトをクリップボードに保存しました。" });
+    };
+
     return (
         <div className="min-h-screen bg-background relative overflow-hidden p-8">
             <div className="max-w-7xl mx-auto space-y-8">
@@ -461,9 +475,50 @@ export default function AudioAnalysis() {
                                                                 テンポ: {Math.round(file.tempo)} • Energy: {Math.round(file.energy)}%
                                                             </p>
                                                         </div>
-                                                        <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Info className="w-4 h-4 text-zinc-400" />
-                                                        </Button>
+                                                        <Popover>
+                                                            <PopoverTrigger asChild>
+                                                                <Button size="icon" variant="ghost" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/20 hover:text-primary">
+                                                                    <Sparkles className="w-4 h-4" />
+                                                                </Button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-80 glass border-white/10 p-4 space-y-4">
+                                                                <div className="space-y-1">
+                                                                    <h4 className="text-sm font-bold flex items-center gap-2">
+                                                                        <Sparkles className="w-4 h-4 text-primary" />
+                                                                        Suno AI プロンプト生成
+                                                                    </h4>
+                                                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">この曲を元にしたスタイル提案</p>
+                                                                </div>
+
+                                                                <div className="bg-black/40 rounded-lg p-3 border border-white/5 space-y-2">
+                                                                    <p className="text-xs italic text-zinc-300 leading-relaxed line-clamp-3">
+                                                                        {generateSunoPrompt(file)}
+                                                                    </p>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        className="w-full h-8 text-[11px] gap-2 bg-primary/20 hover:bg-primary/40 text-primary border border-primary/30"
+                                                                        onClick={() => copyToClipboard(generateSunoPrompt(file))}
+                                                                    >
+                                                                        <Copy className="w-3 h-3" /> プロンプトをコピー
+                                                                    </Button>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div className="glass p-2 rounded text-center">
+                                                                        <p className="text-[8px] text-muted-foreground uppercase">BPM</p>
+                                                                        <p className="text-xs font-bold">{Math.round(file.tempo)}</p>
+                                                                    </div>
+                                                                    <div className="glass p-2 rounded text-center">
+                                                                        <p className="text-[8px] text-muted-foreground uppercase">Energy</p>
+                                                                        <p className="text-xs font-bold">{Math.round(file.energy)}%</p>
+                                                                    </div>
+                                                                    <div className="glass p-2 rounded text-center">
+                                                                        <p className="text-[8px] text-muted-foreground uppercase">Bright</p>
+                                                                        <p className="text-xs font-bold">{Math.round(file.brightness)}%</p>
+                                                                    </div>
+                                                                </div>
+                                                            </PopoverContent>
+                                                        </Popover>
                                                     </div>
                                                 ))}
                                             </div>
