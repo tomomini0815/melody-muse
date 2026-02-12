@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { MusicConfig, MOODS, THEMES, Tempo, Language, Duration, ARTISTS } from "@/lib/types";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
   Sun, Moon, Zap, Feather, CloudRain, Sparkles, User, Globe, Languages, Search,
@@ -253,14 +254,49 @@ export function CustomizeForm({ config, onChange }: Props) {
                   </button>
                 );
               })}
-              {ARTISTS.filter(a =>
+              {searchTerm !== "" && ARTISTS.filter(a =>
                 a.category === artistCategory &&
                 a.label.toLowerCase().includes(searchTerm.toLowerCase())
               ).length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4 px-2 italic">一致するアーティストが見つかりません</p>
+                  <div className="w-full py-4 text-center space-y-3">
+                    <p className="text-sm text-muted-foreground italic">一致するアーティストが見つかりません</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        update({ customArtist: searchTerm, artist: "" });
+                        setSearchTerm("");
+                      }}
+                      className="border-primary/30 hover:bg-primary/10 gap-2"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-primary" />
+                      「{searchTerm}」をカスタムスタイルとして登録する
+                    </Button>
+                  </div>
                 )}
             </motion.div>
           </AnimatePresence>
+
+          {/* Active Status for Custom Artist */}
+          {config.customArtist && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mt-4 p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between gap-3"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs font-bold text-primary">カスタムスタイル有効:</span>
+                <span className="text-xs text-foreground truncate max-w-[150px]">{config.customArtist}</span>
+              </div>
+              <button
+                onClick={() => update({ customArtist: "" })}
+                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+              >
+                解除
+              </button>
+            </motion.div>
+          )}
         </div>
       </div>
 
