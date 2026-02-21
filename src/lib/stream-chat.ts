@@ -1,5 +1,25 @@
 import { Language } from "./types";
 
+/**
+ * Helper to fetch with exponential backoff for 429 errors
+ */
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  let retries = 0;
+  while (true) {
+    const resp = await fetch(url, options);
+
+    if (resp.status === 429 && retries < maxRetries) {
+      const waitTime = Math.pow(2, retries) * 1000 + Math.random() * 1000;
+      console.warn(`Gemini API 429 detected. Retrying in ${Math.round(waitTime)}ms... (Attempt ${retries + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      retries++;
+      continue;
+    }
+
+    return resp;
+  }
+}
+
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.0-flash";
 const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
@@ -67,7 +87,7 @@ Instruments: (e.g., Piano, Electric Guitar, Drums)
 
 Generate the song now:`;
 
-  const resp = await fetch(GEMINI_STREAM_URL, {
+  const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -144,7 +164,7 @@ ${lyrics}
 TARGET LANGUAGE: ${targetName}
 TRANSLATED LYRICS:`;
 
-  const resp = await fetch(GEMINI_POST_URL, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
