@@ -1,3 +1,5 @@
+export type GenerationStatus = "idle" | "analyzing" | "crafting" | "styling" | "finalizing";
+
 export interface Genre {
   id: string;
   label: string;

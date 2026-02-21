@@ -14,7 +14,7 @@ let sharedAudioContext: AudioContext | null = null;
 
 const getAudioContext = () => {
     if (!sharedAudioContext) {
-        sharedAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        sharedAudioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     }
     return sharedAudioContext;
 };

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Music, Shuffle, ArrowLeft, ArrowRight, Clock, Sparkles, AudioWaveform } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -10,18 +10,24 @@ import { CustomizeForm } from "@/components/CustomizeForm";
 import { ResultView } from "@/components/ResultView";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Equalizer } from "@/components/Equalizer";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import {
-  MusicConfig, GeneratedPrompt, DEFAULT_CONFIG, GENRES, MOODS, THEMES, ARTISTS
+  MusicConfig, GeneratedPrompt, DEFAULT_CONFIG, GENRES, MOODS, THEMES, ARTISTS, GenerationStatus
 } from "@/lib/types";
 import { generateLyrics } from "@/lib/stream-chat";
-import { saveToHistory, toggleFavorite } from "@/lib/storage";
+import { saveToHistory, toggleFavorite, migrateToTurso } from "@/lib/storage";
 
 export default function Index() {
   const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    migrateToTurso();
+  }, []);
   const [config, setConfig] = useState<MusicConfig>({ ...DEFAULT_CONFIG });
   const [result, setResult] = useState<GeneratedPrompt | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [genStatus, setGenStatus] = useState<GenerationStatus>("idle");
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const randomize = () => {
@@ -57,6 +63,7 @@ export default function Index() {
     }
     setIsGenerating(true);
     setIsStreaming(true);
+    setGenStatus("analyzing");
     setStep(2);
 
     const id = crypto.randomUUID();
@@ -90,20 +97,26 @@ export default function Index() {
           artist: artistStyle,
         },
         (delta) => {
+          setGenStatus("crafting");
           setResult((prev) => prev ? { ...prev, lyrics: prev.lyrics + delta } : prev);
         },
         () => setIsStreaming(false)
       );
 
+      setGenStatus("styling");
+
       // Parse the full text to extract structured data
       const parsed = parseGeneratedText(fullText, c);
       setResult((prev) => prev ? { ...prev, ...parsed } : prev);
-      saveToHistory({ ...newPrompt, ...parsed });
+
+      setGenStatus("finalizing");
+      await saveToHistory({ ...newPrompt, ...parsed });
     } catch (e) {
       toast({ title: "エラー", description: (e as Error).message, variant: "destructive" });
       setIsStreaming(false);
     } finally {
       setIsGenerating(false);
+      setGenStatus("idle");
     }
   }, [config]);
 
@@ -164,20 +177,20 @@ export default function Index() {
               <p className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">音楽プロンプトジェネレーター</p>
             </div>
           </div>
-          <div className="flex gap-1 sm:gap-2">
+          <div className="flex gap-0 sm:gap-1 ml-auto shrink-0">
             <Link to="/analysis">
-              <Button variant="ghost" size="sm" className="px-2 sm:px-3 h-8 sm:h-9">
-                <AudioWaveform className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
-                <span className="hidden sm:inline">分析スタジオ</span>
+              <Button variant="ghost" size="sm" className="flex flex-col items-center h-auto py-1.5 px-2 hover:bg-primary/10 transition-colors group">
+                <AudioWaveform className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
+                <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">音楽分析</span>
               </Button>
             </Link>
-            <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating} className="px-2 sm:px-3 h-8 sm:h-9">
-              <Shuffle className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
-              <span className="hidden sm:inline">ランダム</span>
+            <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating} className="flex flex-col items-center h-auto py-1.5 px-2 hover:bg-primary/10 transition-colors group">
+              <Shuffle className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
+              <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">ランダム作成</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)} className="px-2 sm:px-3 h-8 sm:h-9">
-              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
-              <span className="hidden sm:inline">履歴</span>
+            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)} className="flex flex-col items-center h-auto py-1.5 px-2 hover:bg-primary/10 transition-colors group">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
+              <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">履歴</span>
             </Button>
           </div>
         </div>
@@ -228,18 +241,18 @@ export default function Index() {
               <ResultView
                 prompt={result}
                 isStreaming={isStreaming}
-                onUpdateLyrics={(lyrics) => {
+                onUpdateLyrics={async (lyrics) => {
                   const updated = { ...result, lyrics };
                   setResult(updated);
-                  saveToHistory(updated);
+                  await saveToHistory(updated);
                 }}
-                onToggleFavorite={() => {
-                  const newFav = toggleFavorite(result.id);
-                  setResult((p) => p ? { ...p, isFavorite: newFav } : p);
+                onToggleFavorite={async () => {
+                  const newFavStatus = await toggleFavorite(result.id);
+                  setResult((p) => p ? { ...p, isFavorite: newFavStatus } : p);
                 }}
-                onUpdatePrompt={(updated) => {
+                onUpdatePrompt={async (updated) => {
                   setResult(updated);
-                  saveToHistory(updated);
+                  await saveToHistory(updated);
                 }}
               />
               <div className="mt-4 flex justify-between">
@@ -256,6 +269,8 @@ export default function Index() {
       </main>
 
       <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} onLoad={loadFromHistory} />
+
+      <LoadingOverlay isVisible={isGenerating && !isStreaming} status={genStatus} />
     </div>
   );
 }

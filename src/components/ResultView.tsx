@@ -17,9 +17,9 @@ import {
 interface Props {
   prompt: GeneratedPrompt;
   isStreaming: boolean;
-  onUpdateLyrics: (lyrics: string) => void;
-  onToggleFavorite: () => void;
-  onUpdatePrompt: (prompt: GeneratedPrompt) => void;
+  onUpdateLyrics: (lyrics: string) => Promise<void>;
+  onToggleFavorite: () => Promise<void>;
+  onUpdatePrompt: (prompt: GeneratedPrompt) => Promise<void>;
 }
 
 export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavorite, onUpdatePrompt }: Props) {
@@ -44,7 +44,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     setIsTranslating(true);
     try {
       const translation = await translateLyrics(prompt.lyrics, targetLang);
-      onUpdateLyrics(translation);
+      await onUpdateLyrics(translation);
       toast({ title: "翻訳完了" });
     } catch (e) {
       toast({ title: "翻訳エラー", description: (e as Error).message, variant: "destructive" });
@@ -55,20 +55,33 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
 
 
   const handleOpenSuno = async () => {
-    const full = `Style Tags: ${prompt.styleTags} \n\n[Lyrics]\n${prompt.lyrics} `;
+    const styleWithMeta = `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
+    const full = `Style Tags: ${styleWithMeta} \n\n[Lyrics]\n${prompt.lyrics} `;
     await navigator.clipboard.writeText(full);
     toast({ title: "プロンプトをコピーしてSuno AIを開きます" });
     window.open("https://suno.com/create", "_blank");
   };
 
+  const handleOpenMureka = async () => {
+    const styleWithMeta = `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
+    const full = `Style Tags: ${styleWithMeta} \n\n[Lyrics]\n${prompt.lyrics} `;
+    await navigator.clipboard.writeText(full);
+    toast({ title: "プロンプトをコピーしてMureka AIを開きます" });
+    window.open("https://mureka.ai/create", "_blank");
+  };
+
+  const [isImageLoading, setIsImageLoading] = useState(false);
+
   const handleGenerateCover = async () => {
     setIsGeneratingCover(true);
+    setIsImageLoading(true);
     try {
       const imageUrl = await generateCoverArt(prompt.lyrics, prompt.styleTags);
-      onUpdatePrompt({ ...prompt, coverUrl: imageUrl });
-      toast({ title: "カバー画像を生成しました" });
+      await onUpdatePrompt({ ...prompt, coverUrl: imageUrl });
+      toast({ title: "カバー画像を生成開始しました" });
     } catch (e) {
       toast({ title: "画像生成エラー", description: (e as Error).message, variant: "destructive" });
+      setIsImageLoading(false);
     } finally {
       setIsGeneratingCover(false);
     }
@@ -93,7 +106,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
       const mergedTags = Array.from(new Set([...existingTags, ...newTags]));
       const finalStyleTags = mergedTags.join(", ");
 
-      onUpdatePrompt({ ...prompt, styleTags: finalStyleTags });
+      await onUpdatePrompt({ ...prompt, styleTags: finalStyleTags });
       toast({ title: "プロンプトをブラッシュアップしました" });
     } catch (e) {
       toast({ title: "変換エラー", description: (e as Error).message, variant: "destructive" });
@@ -112,27 +125,38 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     <div className="space-y-6 pb-2">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between gap-2 overflow-hidden">
+          <div className="flex items-center justify-between gap-2 overflow-hidden bg-secondary/20 p-2 rounded-lg">
             <div className="flex items-center gap-2 shrink-0">
               <h2 className="text-lg sm:text-xl font-display font-semibold text-foreground">生成結果</h2>
-              {isStreaming && <Equalizer bars={3} />}
+              {isStreaming && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 animate-pulse">
+                  <Equalizer bars={3} />
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider">AI 執筆中...</span>
+                </div>
+              )}
             </div>
 
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+              <Button variant="ghost" size="sm" onClick={handleGenerateCover} disabled={isGeneratingCover || isStreaming} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs">
+                {isGeneratingCover ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5 mr-1.5" />}
+                <span className="hidden xs:inline">画像生成</span>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={copyAll} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs" title="一括コピー">
+                <Copy className="w-3.5 h-3.5 mr-1.5" />
+                <span className="hidden xs:inline">コピー</span>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onToggleFavorite} className="h-8 w-8 sm:h-9 glass shrink-0">
+                <Star className={cn("w-3.5 h-3.5", prompt.isFavorite && "fill-yellow-400 text-yellow-400")} />
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 justify-end">
-            <Button variant="ghost" size="sm" onClick={handleGenerateCover} disabled={isGeneratingCover || isStreaming} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs">
-              {isGeneratingCover ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5 mr-1.5" />}
-              <span>画像生成</span>
+          <div className="flex items-center gap-2 justify-end mt-1">
+            <Button size="sm" onClick={handleOpenMureka} className="marble-mureka text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
+              <ExternalLink className="w-3.5 h-3.5 mr-1" />
+              <span>Murekaで作る</span>
             </Button>
-            <Button variant="ghost" size="sm" onClick={copyAll} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs" title="一括コピー">
-              <Copy className="w-3.5 h-3.5 mr-1.5" />
-              <span>コピー</span>
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onToggleFavorite} className="h-8 w-8 sm:h-9 glass shrink-0">
-              <Star className={cn("w-3.5 h-3.5", prompt.isFavorite && "fill-yellow-400 text-yellow-400")} />
-            </Button>
-            <Button size="sm" onClick={handleOpenSuno} className="marble-suno text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg">
+            <Button size="sm" onClick={handleOpenSuno} className="marble-suno text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />
               <span>Sunoで作る</span>
             </Button>
@@ -154,7 +178,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
                 size="sm"
                 onClick={handleRefinePrompt}
                 disabled={isRefining || isStreaming}
-                className="h-8 text-[10px] sm:text-xs gap-1.5 hover:bg-primary/20 text-primary-foreground font-bold gradient-primary border-none rounded-full px-4"
+                className="h-8 text-[10px] sm:text-xs gap-1.5 hover:bg-primary/10 text-primary font-bold border border-primary/50 rounded-full px-4"
               >
                 {isRefining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                 <span>ブラッシュアップ</span>
@@ -172,7 +196,25 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
           {/* Cover Art Section */}
           {prompt.coverUrl && (
             <div className="glass rounded-2xl overflow-hidden aspect-square relative group">
-              <img src={prompt.coverUrl} alt="Cover Art" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              {isImageLoading && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                  <p className="text-[10px] font-medium text-muted-foreground animate-pulse">画像を読み込み中...</p>
+                </div>
+              )}
+              <img
+                src={prompt.coverUrl}
+                alt="Cover Art"
+                className={cn(
+                  "w-full h-full object-cover transition-all duration-500 group-hover:scale-105",
+                  isImageLoading ? "opacity-0 scale-95" : "opacity-100 scale-100"
+                )}
+                onLoad={() => setIsImageLoading(false)}
+                onError={() => {
+                  setIsImageLoading(false);
+                  toast({ title: "画像の読み込みに失敗しました", variant: "destructive" });
+                }}
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
                 <Button variant="secondary" size="sm" className="glass" onClick={() => window.open(prompt.coverUrl, "_blank")}>
                   <ExternalLink className="w-4 h-4 mr-2" /> 拡大

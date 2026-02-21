@@ -59,7 +59,7 @@ export default function AudioAnalysis() {
         if (!items) return;
 
         const droppedFiles: File[] = [];
-        const queue: any[] = [];
+        const queue: FileSystemEntry[] = [];
 
         // Enqueue items
         for (let i = 0; i < items.length; i++) {
@@ -74,18 +74,18 @@ export default function AudioAnalysis() {
         }
 
         // Process queue (Recursive)
-        const processEntry = async (entry: any) => {
+        const processEntry = async (entry: FileSystemEntry) => {
             if (entry.isFile) {
                 try {
-                    const file = await new Promise<File>((resolve, reject) => entry.file(resolve, reject));
+                    const file = await new Promise<File>((resolve, reject) => (entry as FileSystemFileEntry).file(resolve, reject));
                     // Strict check: Must be audio AND have content
                     if (isAudioFile(file) && file.size > 0) droppedFiles.push(file);
                 } catch (err) { console.error("Error reading file", err); }
             } else if (entry.isDirectory) {
-                const dirReader = entry.createReader();
+                const dirReader = (entry as FileSystemDirectoryEntry).createReader();
                 const readEntries = async () => {
                     try {
-                        const entries = await new Promise<any[]>((resolve, reject) => dirReader.readEntries(resolve, reject));
+                        const entries = await new Promise<FileSystemEntry[]>((resolve, reject) => dirReader.readEntries(resolve, reject));
                         if (entries.length > 0) {
                             for (const child of entries) {
                                 await processEntry(child);
@@ -340,7 +340,7 @@ export default function AudioAnalysis() {
                                 accept="audio/*"
                                 className="hidden"
                                 onChange={handleFileSelect}
-                                // @ts-ignore
+                                // @ts-expect-error - webkitdirectory is a non-standard attribute but supported by most browsers
                                 webkitdirectory=""
                             />
 

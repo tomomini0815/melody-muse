@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { GeneratedPrompt } from "@/lib/types";
 import { getHistory, getFavorites, deleteFromHistory, toggleFavorite } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,28 @@ interface Props {
 
 export function HistoryPanel({ open, onClose, onLoad }: Props) {
   const [tab, setTab] = useState<"history" | "favorites">("history");
-  const refresh = () => {
-    // Force re-render by toggling tab state
-    setTab((t) => t);
-  };
+  const [items, setItems] = useState<GeneratedPrompt[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = tab === "history" ? await getHistory() : await getFavorites();
+      setItems(data);
+    } catch (error) {
+      console.error("Failed to load history data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    if (open) {
+      loadData();
+    }
+  }, [open, loadData]);
 
   if (!open) return null;
-
-  const list = tab === "history" ? getHistory() : getFavorites();
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -51,13 +65,17 @@ export function HistoryPanel({ open, onClose, onLoad }: Props) {
           </Button>
         </div>
 
-        {list.length === 0 ? (
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : items.length === 0 ? (
           <p className="text-muted-foreground text-sm text-center py-8">
             {tab === "history" ? "まだ履歴がありません" : "お気に入りがありません"}
           </p>
         ) : (
           <div className="space-y-3">
-            {list.map((item) => (
+            {items.map((item) => (
               <div key={item.id} className="glass rounded-lg p-3 space-y-2">
                 <div className="flex items-start justify-between">
                   <p className="text-xs text-accent font-mono truncate flex-1">{item.styleTags}</p>
@@ -66,9 +84,9 @@ export function HistoryPanel({ open, onClose, onLoad }: Props) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => {
-                        toggleFavorite(item.id);
-                        refresh();
+                      onClick={async () => {
+                        await toggleFavorite(item.id);
+                        loadData();
                       }}
                     >
                       <Star className={cn("w-3 h-3", item.isFavorite && "fill-yellow-400 text-yellow-400")} />
@@ -77,9 +95,9 @@ export function HistoryPanel({ open, onClose, onLoad }: Props) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => {
-                        deleteFromHistory(item.id);
-                        refresh();
+                      onClick={async () => {
+                        await deleteFromHistory(item.id);
+                        loadData();
                       }}
                     >
                       <Trash2 className="w-3 h-3" />
