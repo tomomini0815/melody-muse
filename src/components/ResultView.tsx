@@ -1,12 +1,18 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { Copy, Check, Languages, Star, ExternalLink, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { Copy, Check, Languages as LanguagesIcon, Star, ExternalLink, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { GeneratedPrompt } from "@/lib/types";
+import { GeneratedPrompt, LANGUAGES, Language } from "@/lib/types";
 import { toast } from "@/hooks/use-toast";
 import { translateLyrics, generateCoverArt, refineStyleTags } from "@/lib/stream-chat";
 import { Equalizer } from "./Equalizer";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Props {
   prompt: GeneratedPrompt;
@@ -34,10 +40,9 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     copyText(full, "全体");
   };
 
-  const handleTranslate = async () => {
+  const handleTranslate = async (targetLang: Language) => {
     setIsTranslating(true);
     try {
-      const targetLang = prompt.config.language === "ja" ? "en" : "ja";
       const translation = await translateLyrics(prompt.lyrics, targetLang);
       onUpdateLyrics(translation);
       toast({ title: "翻訳完了" });
@@ -79,7 +84,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
       const refinedRaw = await refineStyleTags(prompt.originalPrompt);
 
       // ブラケット [] を除去し、カンマで分割してクリーンアップ
-      const cleanTags = (text: string) => text.replace(/[\[\]]/g, '').split(',').map(t => t.trim()).filter(t => t !== "");
+      const cleanTags = (text: string) => text.replace(/[[\]]/g, '').split(',').map(t => t.trim()).filter(t => t !== "");
 
       const existingTags = cleanTags(prompt.styleTags);
       const newTags = cleanTags(refinedRaw);
@@ -113,14 +118,6 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
               {isStreaming && <Equalizer bars={3} />}
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              <Button variant="ghost" size="icon" onClick={handleTranslate} disabled={isTranslating || isStreaming} className="h-8 w-8 sm:h-9 sm:w-9 glass shrink-0" title={prompt.config.language === "ja" ? "英訳" : "和訳"}>
-                <Languages className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={onToggleFavorite} className="h-8 w-8 sm:h-9 sm:w-9 glass shrink-0">
-                <Star className={cn("w-4 h-4", prompt.isFavorite && "fill-yellow-400 text-yellow-400")} />
-              </Button>
-            </div>
           </div>
 
           <div className="flex items-center gap-1.5 justify-end">
@@ -131,6 +128,9 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
             <Button variant="ghost" size="sm" onClick={copyAll} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs" title="一括コピー">
               <Copy className="w-3.5 h-3.5 mr-1.5" />
               <span>コピー</span>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onToggleFavorite} className="h-8 w-8 sm:h-9 glass shrink-0">
+              <Star className={cn("w-3.5 h-3.5", prompt.isFavorite && "fill-yellow-400 text-yellow-400")} />
             </Button>
             <Button size="sm" onClick={handleOpenSuno} className="marble-suno text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />
@@ -209,6 +209,26 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-primary">歌詞</h3>
             <div className="flex items-center gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" disabled={isTranslating || isStreaming} className="h-8 px-2 glass gap-1.5" title="言語を変更">
+                    {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LanguagesIcon className="w-3.5 h-3.5" />}
+                    <span className="text-[10px] sm:text-xs">翻訳</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40 glass border-primary/20">
+                  {LANGUAGES.map((lang) => (
+                    <DropdownMenuItem
+                      key={lang.id}
+                      onClick={() => handleTranslate(lang.id)}
+                      className="gap-2 cursor-pointer hover:bg-primary/10"
+                    >
+                      <span>{lang.icon}</span>
+                      <span>{lang.label}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <CopyBtn text={prompt.lyrics} label="歌詞" />
             </div>
           </div>

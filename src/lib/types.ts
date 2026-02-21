@@ -15,7 +15,7 @@ export interface Artist {
 
 export type Mood = "bright" | "dark" | "energetic" | "calm" | "melancholic" | "dreamy";
 export type Tempo = "slow" | "normal" | "fast" | "custom";
-export type Language = "ja" | "en";
+export type Language = "ja" | "en" | "zh" | "id" | "vi";
 export type Duration = "30s" | "1min" | "2min" | "3min+";
 
 export interface MusicConfig {
@@ -94,6 +94,14 @@ export const THEMES = [
   { id: "freedom", label: "自由", labelEn: "Freedom" },
   { id: "nostalgia", label: "ノスタルジア", labelEn: "Nostalgia" },
   { id: "future", label: "未来", labelEn: "Future" },
+];
+
+export const LANGUAGES: { id: Language; label: string; icon: string }[] = [
+  { id: "ja", label: "日本語", icon: "🇯🇵" },
+  { id: "en", label: "English", icon: "🇺🇸" },
+  { id: "zh", label: "中国語", icon: "🇨🇳" },
+  { id: "id", label: "Indonesian", icon: "🇮🇩" },
+  { id: "vi", label: "Vietnamese", icon: "🇻🇳" },
 ];
 
 export const ARTISTS: Artist[] = [

@@ -35,7 +35,7 @@ serve(async (req) => {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "google/gemini-3-flash-preview", // Changed back to match working functions
+                model: "google/gemini-1.5-flash", // Changed to a valid model name
                 messages: [
                     {
                         role: "system",

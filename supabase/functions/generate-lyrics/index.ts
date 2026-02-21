@@ -14,7 +14,15 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const lang = language === "ja" ? "Japanese" : "English";
+    const langMap: Record<string, string> = {
+      "ja": "Japanese",
+      "en": "English",
+      "zh": "Chinese",
+      "id": "Indonesian",
+      "vi": "Vietnamese"
+    };
+    const lang = langMap[language] || "English";
+
     const durationMap: Record<string, string> = {
       "30s": "very short (about 4-6 lines)",
       "1min": "short (about 8-12 lines)",
@@ -22,6 +30,15 @@ serve(async (req) => {
       "3min+": "full length (about 30+ lines with verse/chorus/bridge structure)",
     };
     const lengthDesc = durationMap[duration] || durationMap["2min"];
+
+    const languageInstruction: Record<string, string> = {
+      "ja": "Use natural, poetic Japanese. Consider rhyming patterns (韻) and rhythmic flow.",
+      "en": "Write natural, native-sounding English with good rhyme schemes.",
+      "zh": "Write natural, poetic Chinese. Consider standard rhyming schemes (押韵) and tonal flow.",
+      "id": "Write natural Indonesian lyrics. Focus on rhythm and common song structures in Indonesian music.",
+      "vi": "Write natural Vietnamese lyrics. Pay close attention to the six tones and how they affect the melody and flow (vần and điệu)."
+    };
+    const langDoc = languageInstruction[language] || languageInstruction["en"];
 
     const systemPrompt = `You are a professional songwriter and music producer who creates lyrics and SunoAI prompts. You output structured results in a specific format.
 
@@ -40,7 +57,7 @@ Instruments: <comma-separated instrument list>
 
 Rules:
 - Write lyrics in ${lang}
-- ${language === "ja" ? "Use natural, poetic Japanese. Consider rhyming patterns (韻) and rhythmic flow." : "Write natural, native-sounding English with good rhyme schemes."}
+- ${langDoc}
 - Include musical structure markers: [Intro], [Verse], [Chorus], [Bridge], [Outro] as appropriate
 - Song length: ${lengthDesc}
 - Make style tags specific and useful for SunoAI (comma-separated descriptors inside brackets)

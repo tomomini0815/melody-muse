@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { MusicConfig, MOODS, THEMES, Tempo, Language, Duration, ARTISTS } from "@/lib/types";
+import { MusicConfig, MOODS, THEMES, Tempo, Language, Duration, ARTISTS, LANGUAGES } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
-  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User, Globe, Languages, Search,
+  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User, Globe, Languages as LanguagesIcon, Search,
 } from "lucide-react";
 
 const moodIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -174,7 +174,7 @@ export function CustomizeForm({ config, onChange }: Props) {
                     artistCategory === "japanese" ? "text-primary-foreground font-bold" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Languages className="w-4 h-4" />
+                  <LanguagesIcon className="w-4 h-4" />
                   Japanese
                 </button>
                 <button
@@ -299,19 +299,20 @@ export function CustomizeForm({ config, onChange }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div>
           <h3 className="text-lg font-display font-semibold mb-3">言語</h3>
-          <div className="flex gap-2">
-            {(["ja", "en"] as Language[]).map((lang) => (
+          <div className="grid grid-cols-2 gap-2">
+            {LANGUAGES.map((lang) => (
               <button
-                key={lang}
-                onClick={() => update({ language: lang })}
+                key={lang.id}
+                onClick={() => update({ language: lang.id })}
                 className={cn(
-                  "flex-1 py-2 rounded-lg border text-sm transition-all",
-                  config.language === lang
+                  "flex items-center justify-center gap-2 py-2 rounded-lg border text-sm transition-all",
+                  config.language === lang.id
                     ? "border-primary bg-primary/10 text-foreground"
                     : "border-border text-muted-foreground hover:border-primary/40"
                 )}
               >
-                {lang === "ja" ? "🇯🇵 日本語" : "🇺🇸 English"}
+                <span>{lang.icon}</span>
+                <span>{lang.label}</span>
               </button>
             ))}
           </div>
