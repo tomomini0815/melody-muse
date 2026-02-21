@@ -9,9 +9,8 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5)
     const resp = await fetch(url, options);
 
     if (resp.status === 429 && retries < maxRetries) {
-      // Gemini 429s often require 30s+ wait times. 
-      // Using a longer backoff starting from 10s.
-      const waitTime = Math.pow(2, retries) * 10000 + Math.random() * 2000;
+      // Starting with 5s backoff for standard rate limits.
+      const waitTime = Math.pow(2, retries) * 5000 + Math.random() * 1000;
       console.warn(`Gemini API 429 detected. Retrying in ${Math.round(waitTime / 1000)}s... (Attempt ${retries + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       retries++;
@@ -23,7 +22,7 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5)
 }
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.0-flash-lite";
+const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
