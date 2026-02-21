@@ -199,7 +199,7 @@ Style Tags: ${styleTags}
 
 Output ONLY the descriptive prompt in English. No other text.`;
 
-  const resp = await fetch(GEMINI_POST_URL, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -231,7 +231,7 @@ Output only the tags separated by commas. Do not include brackets or extra text.
 
 Input Description: ${prompt}`;
 
-  const resp = await fetch(GEMINI_POST_URL, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
