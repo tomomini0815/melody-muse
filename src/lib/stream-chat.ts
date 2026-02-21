@@ -97,7 +97,7 @@ Generate the song now:`;
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
       }
     }),
   });
@@ -111,17 +111,22 @@ Generate the song now:`;
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
+  let lineBuffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const chunk = decoder.decode(value);
-    const lines = chunk.split("\n");
+    const chunk = decoder.decode(value, { stream: true });
+    lineBuffer += chunk;
+    const lines = lineBuffer.split("\n");
+    lineBuffer = lines.pop() || "";
+
     for (const line of lines) {
-      if (line.startsWith("data: ")) {
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith("data: ")) {
         try {
-          const data = JSON.parse(line.slice(6));
+          const data = JSON.parse(trimmedLine.slice(6));
           const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (content) {
             fullText += content;
