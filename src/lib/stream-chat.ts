@@ -23,11 +23,10 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 8)
 }
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-2.0-flash";
 
-// Security Note: Use x-goog-api-key header instead of query parameter to avoid leak in logs
-const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
-const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
+const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
+const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 export interface GenerateRequest {
   genres: string[];
@@ -116,8 +115,7 @@ Generate the song and analysis now:`;
   const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
@@ -392,8 +390,7 @@ Input Description: ${prompt}`;
   const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }]
@@ -430,8 +427,7 @@ REFINED LYRICS:`;
   const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
@@ -489,8 +485,7 @@ Generate the OPTIMIZED song and new analysis now:`;
   const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
