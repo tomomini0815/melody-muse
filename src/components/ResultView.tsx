@@ -1,12 +1,13 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { Copy, Check, Languages as LanguagesIcon, Star, ExternalLink, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { Copy, Check, Languages as LanguagesIcon, Star, ExternalLink, Image as ImageIcon, Loader2, Sparkles, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { GeneratedPrompt, LANGUAGES, Language } from "@/lib/types";
 import { toast } from "@/hooks/use-toast";
 import { translateLyrics, generateCoverArt, refineStyleTags } from "@/lib/stream-chat";
 import { Equalizer } from "./Equalizer";
+import { MVGeneratorModal } from "./MVGeneratorModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   const [isTranslating, setIsTranslating] = useState(false);
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const [isMVOpen, setIsMVOpen] = useState(false);
 
   const copyText = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
@@ -137,6 +139,10 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+              <Button variant="ghost" size="sm" onClick={() => setIsMVOpen(true)} disabled={isStreaming} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs text-primary border border-primary/30">
+                <Film className="w-3.5 h-3.5 mr-1.5" />
+                <span className="hidden xs:inline">MV生成</span>
+              </Button>
               <Button variant="ghost" size="sm" onClick={handleGenerateCover} disabled={isGeneratingCover || isStreaming} className="h-8 sm:h-9 glass px-2 sm:px-3 text-[10px] sm:text-xs">
                 {isGeneratingCover ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5 mr-1.5" />}
                 <span className="hidden xs:inline">画像生成</span>
@@ -282,6 +288,9 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
           />
         </div>
       </div>
+
+      {/* MV Generator Modal */}
+      <MVGeneratorModal prompt={prompt} open={isMVOpen} onOpenChange={setIsMVOpen} />
     </div>
   );
 }

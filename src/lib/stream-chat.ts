@@ -26,6 +26,21 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
+// Common safety settings to avoid unexpected blocking of creative content
+const SAFETY_SETTINGS = [
+  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+];
+
+const COMMON_GEN_CONFIG = {
+  temperature: 0.7,
+  topK: 40,
+  topP: 0.95,
+  maxOutputTokens: 4096,
+};
+
 export interface GenerateRequest {
   genres: string[];
   mood: string;
@@ -93,12 +108,8 @@ Generate the song now:`;
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 4096,
-      }
+      generationConfig: COMMON_GEN_CONFIG,
+      safetySettings: SAFETY_SETTINGS,
     }),
   });
 
@@ -175,9 +186,8 @@ TRANSLATED LYRICS:`;
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.3, // Lower temperature for more accurate translation
-      }
+      generationConfig: { ...COMMON_GEN_CONFIG, temperature: 0.3 },
+      safetySettings: SAFETY_SETTINGS,
     }),
   });
 
@@ -187,7 +197,11 @@ TRANSLATED LYRICS:`;
     throw new Error(`翻訳に失敗しました: ${resp.status}`);
   }
   const data = await resp.json();
-  const translation = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("安全フィルターにより翻訳がブロックされました。歌詞の内容を調整してください。");
+  }
+  const translation = candidate?.content?.parts?.find((p: any) => p.text)?.text;
   if (!translation) throw new Error("翻訳結果が空です。");
   return translation;
 }
@@ -207,13 +221,19 @@ Output ONLY the descriptive prompt in English. No other text.`;
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt }] }]
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: COMMON_GEN_CONFIG,
+      safetySettings: SAFETY_SETTINGS,
     }),
   });
 
   if (!resp.ok) throw new Error("画像プロンプトの生成に失敗しました。");
   const data = await resp.json();
-  const visualPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("安全フィルターにより画像プロンプトの生成がブロックされました。歌詞の内容を調整してください。");
+  }
+  const visualPrompt = candidate?.content?.parts?.find((p: any) => p.text)?.text;
   if (!visualPrompt) throw new Error("画像プロンプトが空です。");
 
   // 2. Return Pollinations.ai URL (Direct Image API)
@@ -229,6 +249,96 @@ Output ONLY the descriptive prompt in English. No other text.`;
   return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
 }
 
+/**
+ * MVシーン画像を生成する。歌詞セクションごとにシーン記述→画像URLを生成。
+ */
+export async function generateMVSceneImages(
+  lyrics: string,
+  styleTags: string,
+  mood: string,
+  sceneCount: number,
+  artStyle: string = "cinematic",
+  onProgress?: (percent: number) => void
+): Promise<string[]> {
+  // 1. Generate scene descriptions using Gemini
+  const geminiPrompt = `You are a cinematographer creating a music video storyboard.
+Based on the lyrics and style, create ${sceneCount} visual scene descriptions for a music video.
+
+Art Style Requirement: ${artStyle}
+Music Style: ${styleTags}
+Mood: ${mood}
+
+Lyrics:
+"""
+${lyrics.substring(0, 1500)}
+"""
+
+For each scene, output a short (30-40 word) visual description in English that could be used as an image generation prompt.
+Focus on: visual composition, lighting, color palette, camera angle, artistic style (${artStyle}).
+Do NOT include any text/letters/words in the scenes.
+
+Output format - each scene on a new line, numbered 1-${sceneCount}:
+1. [description]
+2. [description]
+...`;
+
+  onProgress?.(5);
+
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: { ...COMMON_GEN_CONFIG, temperature: 0.8 },
+      safetySettings: SAFETY_SETTINGS,
+    }),
+  });
+
+  if (!resp.ok) throw new Error("シーン記述の生成に失敗しました。");
+  const data = await resp.json();
+  const candidate = data.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("安全フィルターによりシーン記述の生成がブロックされました。歌詞を控えめに調整してください。");
+  }
+  const rawText = candidate?.content?.parts?.find((p: any) => p.text)?.text || "";
+
+  // Parse scene descriptions
+  const sceneDescs: string[] = [];
+  const lines = rawText.split("\n").filter((l: string) => l.trim());
+  for (const line of lines) {
+    const match = line.match(/^\d+\.\s*(.+)/);
+    if (match) {
+      sceneDescs.push(match[1].trim());
+    }
+  }
+
+  // Ensure we have enough scenes
+  while (sceneDescs.length < sceneCount) {
+    sceneDescs.push(sceneDescs[sceneDescs.length - 1] || "abstract cinematic visual, moody lighting, atmospheric");
+  }
+
+  onProgress?.(20);
+
+  // 2. Generate image URLs for each scene using Pollinations.ai
+  const imageUrls: string[] = [];
+  for (let i = 0; i < Math.min(sceneDescs.length, sceneCount); i++) {
+    const cleanPrompt = sceneDescs[i]
+      .replace(/^["'`\s]+|["'`\s]+$/g, "")
+      .replace(/```[a-z]*\n?|```/g, "")
+      .trim();
+
+    const encodedPrompt = encodeURIComponent(`${artStyle} style, ${cleanPrompt}, high quality, detailed, filmic, no text`);
+    const seed = Math.floor(Math.random() * 1000000);
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=960&height=540&seed=${seed}&nologo=true`;
+    imageUrls.push(url);
+
+    onProgress?.(20 + (80 * (i + 1)) / sceneCount);
+  }
+
+  onProgress?.(100);
+  return imageUrls;
+}
+
 export async function refineStyleTags(prompt: string): Promise<string> {
   const geminiPrompt = `Refine the following music description into short, effective style tags for an AI music generator like Suno.
 Output only the tags separated by commas. Do not include brackets or extra text.
@@ -239,13 +349,16 @@ Input Description: ${prompt}`;
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt }] }]
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: COMMON_GEN_CONFIG,
+      safetySettings: SAFETY_SETTINGS,
     }),
   });
 
   if (!resp.ok) throw new Error("プロンプト精査に失敗しました。");
   const data = await resp.json();
-  const refined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const refined = candidate?.content?.parts?.find((p: any) => p.text)?.text;
   if (!refined) throw new Error("精査結果が空です。");
   return refined;
 }
