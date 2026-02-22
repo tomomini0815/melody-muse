@@ -4,29 +4,44 @@ import { Language, LANGUAGES } from "./types";
 /**
  * Helper to fetch with exponential backoff for 429 errors
  */
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 8): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5): Promise<Response> {
   let retries = 0;
   while (true) {
-    const resp = await fetch(url, options);
+    try {
+      const resp = await fetch(url, options);
 
-    if (resp.status === 429 && retries < maxRetries) {
-      // More aggressive backoff for 2.5 Flash Lite quota limits.
-      const waitTime = Math.pow(2, retries) * 10000 + Math.random() * 3000;
-      console.warn(`Gemini API 429 detected. Waiting ${Math.round(waitTime / 1000)}s before next attempt... (Attempt ${retries + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-      retries++;
-      continue;
+      // Retry for 429 (Quota) and 5xx (Server errors)
+      if ((resp.status === 429 || resp.status >= 500) && retries < maxRetries) {
+        const waitTime = Math.pow(2, retries) * 5000 + Math.random() * 1000;
+        console.warn(`Gemini API ${resp.status} detected. Retrying in ${Math.round(waitTime / 1000)}s... (${retries + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        retries++;
+        continue;
+      }
+
+      return resp;
+    } catch (err) {
+      if (retries < maxRetries) {
+        console.warn("Network error. Retrying in 2s...", err);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retries++;
+        continue;
+      }
+      throw err;
     }
-
-    return resp;
   }
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.0-flash";
-
-const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
-const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+function getGeminiConfig() {
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  const model = "gemini-2.0-flash-lite"; // Most stable for free tier
+  return {
+    key,
+    model,
+    streamUrl: `https://generativelanguage.googleapis.com/v1/models/${model}:streamGenerateContent?key=${key}&alt=sse`,
+    postUrl: `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key}`
+  };
+}
 
 export interface GenerateRequest {
   genres: string[];
@@ -112,17 +127,16 @@ Suggestions: (List 2-3 specific ways to increase the score)
 
 Generate the song and analysis now:`;
 
-  const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
+  const { key, streamUrl } = getGeminiConfig();
+  if (!key) throw new Error("APIキーが設定されていません。.envファイルを確認してください。");
+
+  const resp = await fetchWithRetry(streamUrl, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
         maxOutputTokens: 4096,
       }
     }),
@@ -165,6 +179,19 @@ Generate the song and analysis now:`;
     }
   }
 
+  // Process any remaining partial line in buffer if we're done
+  const finalTrimmed = lineBuffer.trim();
+  if (finalTrimmed.startsWith("data: ")) {
+    try {
+      const data = JSON.parse(finalTrimmed.slice(6));
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (content) {
+        fullText += content;
+        onDelta(content);
+      }
+    } catch (e) { }
+  }
+
   onDone();
   return fullText;
 }
@@ -190,13 +217,14 @@ ${lyrics}
 TARGET LANGUAGE: ${targetName}
 TRANSLATED LYRICS:`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.3, // Lower temperature for more accurate translation
+        temperature: 0.3,
       }
     }),
   });
@@ -223,7 +251,8 @@ Style Tags: ${styleTags}
 
 Output ONLY the descriptive prompt in English. No other text.`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -304,7 +333,8 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 
   onProgress?.(5);
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -387,11 +417,10 @@ Output only the tags separated by commas. Do not include brackets or extra text.
 
 Input Description: ${prompt}`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }]
     }),
@@ -424,16 +453,13 @@ CONSTRAINTS:
 
 REFINED LYRICS:`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: {
-        temperature: 0.8,
-      }
+      generationConfig: { temperature: 0.8 }
     }),
   });
 
@@ -482,16 +508,13 @@ INSTRUCTIONS:
 
 Generate the OPTIMIZED song and new analysis now:`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: {
-        temperature: 0.85,
-      }
+      generationConfig: { temperature: 0.85 }
     }),
   });
 
