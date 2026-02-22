@@ -328,3 +328,45 @@ Input Description: ${prompt}`;
   if (!refined) throw new Error("精査結果が空です。");
   return refined;
 }
+export async function refineLyrics(currentLyrics: string, feedback: string): Promise<string> {
+  const geminiPrompt = `You are an expert songwriter.
+TASK: Refine the provided lyrics based on the user's feedback.
+
+ORIGINAL LYRICS:
+"""
+${currentLyrics}
+"""
+
+USER FEEDBACK:
+"${feedback}"
+
+CONSTRAINTS:
+- Keep the overall structure (Verse, Chorus, etc.) similar to the original unless instructed otherwise.
+- Output ONLY the refined lyrics.
+- Do NOT add any explanations or prefix like "Here are the refined lyrics".
+- If the original lyrics are in Japanese, the refined lyrics should also be in Japanese (unless feedback says otherwise).
+- Make it emotional, poetic, and professional.
+
+REFINED LYRICS:`;
+
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: {
+        temperature: 0.8,
+      }
+    }),
+  });
+
+  if (!resp.ok) {
+    const errorBody = await resp.text();
+    console.error("Gemini API Error (Refine):", resp.status, errorBody);
+    throw new Error(`ブラッシュアップに失敗しました: ${resp.status}`);
+  }
+  const data = await resp.json();
+  const refined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!refined) throw new Error("ブラッシュアップ結果が空です。");
+  return refined;
+}

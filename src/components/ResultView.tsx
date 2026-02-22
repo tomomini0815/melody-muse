@@ -14,6 +14,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { refineLyrics as refineLyricsApi } from "@/lib/stream-chat";
 
 interface Props {
   prompt: GeneratedPrompt;
@@ -26,9 +33,12 @@ interface Props {
 export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavorite, onUpdatePrompt }: Props) {
   const [copied, setCopied] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isRefiningLyrics, setIsRefiningLyrics] = useState(false);
+  const [refinementFeedback, setRefinementFeedback] = useState("");
   const [isGeneratingCover, setIsGeneratingCover] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [isMVOpen, setIsMVOpen] = useState(false);
+  const [isRefinePopoverOpen, setIsRefinePopoverOpen] = useState(false);
 
   const copyText = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
@@ -52,6 +62,25 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
       toast({ title: "翻訳エラー", description: (e as Error).message, variant: "destructive" });
     } finally {
       setIsTranslating(false);
+    }
+  };
+
+  const handleRefineLyrics = async () => {
+    if (!refinementFeedback.trim()) {
+      toast({ title: "指示を入力してください", variant: "destructive" });
+      return;
+    }
+    setIsRefiningLyrics(true);
+    setIsRefinePopoverOpen(false);
+    try {
+      const refined = await refineLyricsApi(prompt.lyrics, refinementFeedback);
+      await onUpdateLyrics(refined);
+      toast({ title: "ブラッシュアップ完了" });
+      setRefinementFeedback("");
+    } catch (e) {
+      toast({ title: "ブラッシュアップエラー", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsRefiningLyrics(false);
     }
   };
 
@@ -257,6 +286,36 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-primary">歌詞</h3>
             <div className="flex items-center gap-1">
+              <Popover open={isRefinePopoverOpen} onOpenChange={setIsRefinePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" disabled={isRefiningLyrics || isStreaming} className="h-8 px-2 glass gap-1.5" title="歌詞をブラッシュアップ">
+                    {isRefiningLyrics ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    <span className="text-[10px] sm:text-xs">ブラッシュアップ</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 glass border-primary/20 p-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm leading-none">歌詞への指示</h4>
+                      <p className="text-xs text-muted-foreground">
+                        「もっと韻を踏んで」「サビをドラマチックに」など、AIへの要望を入力してください。
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="例：もっとエモーショナルにして"
+                        value={refinementFeedback}
+                        onChange={(e) => setRefinementFeedback(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleRefineLyrics()}
+                        className="bg-transparent border-primary/20 h-9"
+                      />
+                      <Button size="sm" onClick={handleRefineLyrics} disabled={isRefiningLyrics}>
+                        実行
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" disabled={isTranslating || isStreaming} className="h-8 px-2 glass gap-1.5" title="言語を変更">
