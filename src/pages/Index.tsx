@@ -30,6 +30,11 @@ export default function Index() {
   const [genStatus, setGenStatus] = useState<GenerationStatus>("idle");
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  // Scroll to top on step change
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
+
   const randomize = () => {
     const shuffled = [...GENRES].sort(() => Math.random() - 0.5);
     const rGenres = shuffled.slice(0, 1 + Math.floor(Math.random() * 3)).map((g) => g.id);
@@ -65,6 +70,7 @@ export default function Index() {
     setIsStreaming(true);
     setGenStatus("analyzing");
     setStep(2);
+    window.scrollTo(0, 0);
 
     const id = crypto.randomUUID();
     const newPrompt: GeneratedPrompt = {
@@ -148,6 +154,8 @@ export default function Index() {
     setResult(prompt);
     setConfig(prompt.config);
     setStep(2);
+    window.scrollTo(0, 0);
+    setHistoryOpen(false); // Close history panel after loading
   };
 
   return (
