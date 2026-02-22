@@ -26,21 +26,6 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-// Common safety settings to avoid unexpected blocking of creative content
-const SAFETY_SETTINGS = [
-  { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-  { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-  { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-  { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-];
-
-const COMMON_GEN_CONFIG = {
-  temperature: 0.7,
-  topK: 40,
-  topP: 0.95,
-  maxOutputTokens: 4096,
-};
-
 export interface GenerateRequest {
   genres: string[];
   mood: string;
@@ -108,8 +93,12 @@ Generate the song now:`;
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: COMMON_GEN_CONFIG,
-      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 4096,
+      }
     }),
   });
 
@@ -186,8 +175,9 @@ TRANSLATED LYRICS:`;
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { ...COMMON_GEN_CONFIG, temperature: 0.3 },
-      safetySettings: SAFETY_SETTINGS,
+      generationConfig: {
+        temperature: 0.3, // Lower temperature for more accurate translation
+      }
     }),
   });
 
@@ -197,11 +187,7 @@ TRANSLATED LYRICS:`;
     throw new Error(`翻訳に失敗しました: ${resp.status}`);
   }
   const data = await resp.json();
-  const candidate = data.candidates?.[0];
-  if (candidate?.finishReason === "SAFETY") {
-    throw new Error("安全フィルターにより翻訳がブロックされました。歌詞の内容を調整してください。");
-  }
-  const translation = candidate?.content?.parts?.find((p: any) => p.text)?.text;
+  const translation = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!translation) throw new Error("翻訳結果が空です。");
   return translation;
 }
@@ -221,19 +207,13 @@ Output ONLY the descriptive prompt in English. No other text.`;
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: COMMON_GEN_CONFIG,
-      safetySettings: SAFETY_SETTINGS,
+      contents: [{ parts: [{ text: geminiPrompt }] }]
     }),
   });
 
   if (!resp.ok) throw new Error("画像プロンプトの生成に失敗しました。");
   const data = await resp.json();
-  const candidate = data.candidates?.[0];
-  if (candidate?.finishReason === "SAFETY") {
-    throw new Error("安全フィルターにより画像プロンプトの生成がブロックされました。歌詞の内容を調整してください。");
-  }
-  const visualPrompt = candidate?.content?.parts?.find((p: any) => p.text)?.text;
+  const visualPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!visualPrompt) throw new Error("画像プロンプトが空です。");
 
   // 2. Return Pollinations.ai URL (Direct Image API)
@@ -289,18 +269,13 @@ Output format - each scene on a new line, numbered 1-${sceneCount}:
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: { ...COMMON_GEN_CONFIG, temperature: 0.8 },
-      safetySettings: SAFETY_SETTINGS,
+      generationConfig: { temperature: 0.8 }
     }),
   });
 
   if (!resp.ok) throw new Error("シーン記述の生成に失敗しました。");
   const data = await resp.json();
-  const candidate = data.candidates?.[0];
-  if (candidate?.finishReason === "SAFETY") {
-    throw new Error("安全フィルターによりシーン記述の生成がブロックされました。歌詞を控えめに調整してください。");
-  }
-  const rawText = candidate?.content?.parts?.find((p: any) => p.text)?.text || "";
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
   // Parse scene descriptions
   const sceneDescs: string[] = [];
@@ -349,16 +324,13 @@ Input Description: ${prompt}`;
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: COMMON_GEN_CONFIG,
-      safetySettings: SAFETY_SETTINGS,
+      contents: [{ parts: [{ text: geminiPrompt }] }]
     }),
   });
 
   if (!resp.ok) throw new Error("プロンプト精査に失敗しました。");
   const data = await resp.json();
-  const candidate = data.candidates?.[0];
-  const refined = candidate?.content?.parts?.find((p: any) => p.text)?.text;
+  const refined = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!refined) throw new Error("精査結果が空です。");
   return refined;
 }

@@ -56,7 +56,7 @@ export function MVGeneratorModal({ prompt, open, onOpenChange }: Props) {
                         </TabsTrigger>
                         <TabsTrigger value="cinematic" className="gap-2 text-xs sm:text-sm data-[state=active]:bg-primary/20">
                             <Film className="w-4 h-4" />
-                            シネマティックMV（開発中）
+                            シネマティックMV
                         </TabsTrigger>
                     </TabsList>
 

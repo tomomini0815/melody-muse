@@ -91,13 +91,6 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     };
 
     const handlePlayClick = () => {
-        if (scenes.length === 0) {
-            toast({
-                title: "シーンを生成してください",
-                description: "「シーン生成」ボタンを押してAI画像を作成してから再生してください。",
-            });
-            return;
-        }
         play();
     };
 
