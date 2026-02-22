@@ -121,14 +121,22 @@ export default function Index() {
   }, [config]);
 
   const parseGeneratedText = (text: string, cfg: MusicConfig): Partial<GeneratedPrompt> => {
-    // Try to extract style tags, meta, and lyrics from AI output
+    // Helper to extract numeric values from potential bold/markdown text
+    const getNum = (regex: RegExp, fallback = 0) => {
+      const m = text.match(regex);
+      return m ? parseInt(m[1]) : fallback;
+    };
+
     const styleMatch = text.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i)
       || text.match(/Style\s*Tags?:\s*(.*?)(?:\n|$)/i);
     const bpmMatch = text.match(/BPM:\s*(\d+)/i);
     const keyMatch = text.match(/Key:\s*([A-Ga-g][#b]?\s*(?:major|minor|maj|min)?)/i);
     const instrMatch = text.match(/Instruments?:\s*(.*?)(?:\n|$)/i);
+
+    // Improved lyrics match to stop before Viral Analysis
     const lyricsMatch = text.match(/\[LYRICS?\]\s*([\s\S]*?)(?:\n\[|$)/i)
       || text.match(/歌詞[：:]\s*([\s\S]*?)(?:\n\[|$)/i);
+
     const viralMatch = text.match(/\[VIRAL\s*ANALYSIS\]\s*([\s\S]*)/i);
 
     const genreLabels = cfg.genres.map((g) => GENRES.find((x) => x.id === g)?.labelEn || g);
@@ -137,15 +145,24 @@ export default function Index() {
     let viralAnalysis = undefined;
     if (viralMatch) {
       const vText = viralMatch[1];
-      const score = parseInt(vText.match(/Score:\s*(\d+)/i)?.[1] || "0");
-      const melody = parseInt(vText.match(/Melody:\s*(\d+)/i)?.[1] || "0");
-      const empathy = parseInt(vText.match(/Empathy:\s*(\d+)/i)?.[1] || "0");
-      const trend = parseInt(vText.match(/Trend:\s*(\d+)/i)?.[1] || "0");
-      const market = vText.match(/Market:\s*(.*?)(?:\n|$)/i)?.[1]?.trim() || "";
-      const suggestions = vText.match(/Suggestions:\s*([\s\S]*)/i)?.[1]
+
+      // More robust numeric extraction (handles **Score:**, スコア:, etc.)
+      const extractScore = (key: string) => {
+        const re = new RegExp(`(?:${key}|${key.toLowerCase()})[:：]\\s*\\*?\\*?(\\d+)`, "i");
+        const m = vText.match(re);
+        return m ? parseInt(m[1]) : 0;
+      };
+
+      const score = extractScore("Score");
+      const melody = extractScore("Melody");
+      const empathy = extractScore("Empathy");
+      const trend = extractScore("Trend");
+
+      const market = vText.match(/(?:Market|市場)[:：]\s*(.*?)(?:\n|$)/i)?.[1]?.trim() || "";
+      const suggestions = vText.match(/(?:Suggestions|提案)[:：]\s*([\s\S]*)/i)?.[1]
         ?.split("\n")
         .map(s => s.replace(/^[-*•\s\d.]+\s*/, "").trim())
-        .filter(s => s !== "")
+        .filter(s => s !== "" && !s.toLowerCase().includes("score"))
         .slice(0, 3) || [];
 
       viralAnalysis = {

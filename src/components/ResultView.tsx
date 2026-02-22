@@ -20,7 +20,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { refineLyrics as refineLyricsApi } from "@/lib/stream-chat";
+import { refineLyrics as refineLyricsApi, optimizeLyricsForVirality as optimizeLyricsForViralityApi } from "@/lib/stream-chat";
 import { ViralPredictor } from "./ViralPredictor";
 
 interface Props {
@@ -144,6 +144,74 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
       toast({ title: "変換エラー", description: (e as Error).message, variant: "destructive" });
     } finally {
       setIsRefining(false);
+    }
+  };
+
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const handleOptimizeViral = async () => {
+    if (!prompt.viralAnalysis) return;
+    setIsOptimizing(true);
+    try {
+      const optimizedText = await optimizeLyricsForViralityApi(
+        prompt.lyrics,
+        prompt.viralAnalysis,
+        prompt.styleTags,
+        prompt.config.language
+      );
+
+      // Index.tsx と同じパースロジックを期待 (本当は共通化した方がいいが)
+      // 仮のパース関数をここで呼ぶか、Indexから渡す必要があるが
+      // 実際には Index.tsx の parseGeneratedText を直接使えないので、Index側のステート更新に繋げるのが正解
+      // しかしここでは ResultView が onUpdatePrompt を持っているのでそれを使う
+
+      // 注意: parseGeneratedText は Index.tsx 内にあるため
+      // 1. ResultView に parseGeneratedText prop を渡す
+      // 2. またはここで簡易パースを実装する
+      // 今回は 2 を選択 (Index.tsx のロジックと同期させる)
+
+      const styleMatch = optimizedText.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+      const lyricsMatch = optimizedText.match(/\[LYRICS?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+      const viralMatch = optimizedText.match(/\[VIRAL\s*ANALYSIS\]\s*([\s\S]*)/i);
+
+      const newStyleTags = styleMatch?.[1]?.trim() || prompt.styleTags;
+      const newLyrics = lyricsMatch?.[1]?.trim() || optimizedText.split(/\[VIRAL/i)[0].trim();
+
+      let newViralAnalysis = prompt.viralAnalysis;
+      if (viralMatch) {
+        const vText = viralMatch[1];
+        const extractScore = (key: string) => {
+          const re = new RegExp(`(?:${key}|${key.toLowerCase()})[:：]\\s*\\*?\\*?(\\d+)`, "i");
+          const m = vText.match(re);
+          return m ? parseInt(m[1]) : 0;
+        };
+        newViralAnalysis = {
+          score: extractScore("Score"),
+          breakdown: {
+            melody: extractScore("Melody"),
+            empathy: extractScore("Empathy"),
+            trend: extractScore("Trend"),
+          },
+          marketTrend: vText.match(/(?:Market|市場)[:：]\s*(.*?)(?:\n|$)/i)?.[1]?.trim() || "",
+          suggestions: vText.match(/(?:Suggestions|提案)[:：]\s*([\s\S]*)/i)?.[1]
+            ?.split("\n")
+            .map(s => s.replace(/^[-*•\s\d.]+\s*/, "").trim())
+            .filter(s => s !== "" && !s.toLowerCase().includes("score"))
+            .slice(0, 3) || []
+        };
+      }
+
+      await onUpdatePrompt({
+        ...prompt,
+        styleTags: newStyleTags,
+        lyrics: newLyrics,
+        viralAnalysis: newViralAnalysis
+      });
+
+      toast({ title: "バズり最適化が完了しました！" });
+    } catch (e) {
+      toast({ title: "最適化エラー", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsOptimizing(false);
     }
   };
 
@@ -285,7 +353,11 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
         {/* Lyrics */}
         <div className="space-y-6">
           {prompt.viralAnalysis && (
-            <ViralPredictor analysis={prompt.viralAnalysis} />
+            <ViralPredictor
+              analysis={prompt.viralAnalysis}
+              onOptimize={handleOptimizeViral}
+              isOptimizing={isOptimizing}
+            />
           )}
 
           <div className="glass rounded-xl p-4">

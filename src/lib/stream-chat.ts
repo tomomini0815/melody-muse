@@ -439,3 +439,59 @@ REFINED LYRICS:`;
   if (!refined) throw new Error("ブラッシュアップ結果が空です。");
   return refined;
 }
+/**
+ * バズ予測の解析結果を基に、歌詞を「バズる方向」へ自動調整する
+ */
+export async function optimizeLyricsForVirality(
+  currentLyrics: string,
+  analysis: any,
+  styleTags: string,
+  targetLang: string = "Japanese"
+): Promise<string> {
+  const geminiPrompt = `You are a world-class music producer and viral marketing विशेषज्ञ.
+TASK: Optimize the provided lyrics to maximize its viral potential based on the following analysis.
+
+CURRENT LYRICS:
+"""
+${currentLyrics}
+"""
+
+CURRENT VIRAL ANALYSIS:
+- Overall Score: ${analysis.score}%
+- Melody/Catchiness: ${analysis.breakdown.melody}
+- Empathy/Relatability: ${analysis.breakdown.empathy}
+- Trend Alignment: ${analysis.breakdown.trend}
+- Market Trend: ${analysis.marketTrend}
+- AI Suggestions: ${analysis.suggestions.join(", ")}
+
+INSTRUCTIONS:
+1. Rewrite the lyrics to specifically address the "AI Suggestions" and improve the scores.
+2. If Empathy is low, add more relatable, emotional, or "human" storytelling.
+3. If Trend is low, incorporate modern slang, viral-friendly structures (short punchy hooks), or genre-specific keywords (e.g., J-Pop tropes).
+4. Maintain the overall theme and language (${targetLang}).
+5. Output your response in the SAME format as the original generation, including [Style Tags], [Meta], [Lyrics], and a NEW [Viral Analysis].
+6. The NEW Viral Analysis should reflect the improvements you've made. It should aim for 90%+ score.
+
+Generate the OPTIMIZED song and new analysis now:`;
+
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: {
+        temperature: 0.85,
+      }
+    }),
+  });
+
+  if (!resp.ok) {
+    const errorBody = await resp.text();
+    console.error("Gemini API Error (Optimize):", resp.status, errorBody);
+    throw new Error(`最適化に失敗しました: ${resp.status}`);
+  }
+  const data = await resp.json();
+  const optimizedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!optimizedText) throw new Error("最適化結果が空です。");
+  return optimizedText;
+}
