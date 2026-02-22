@@ -63,7 +63,20 @@ export async function generateLyrics(
   };
   const targetLang = langMap[config.language] || "Japanese";
 
-  const prompt = `You are a professional music producer and songwriter. Generate a song based on the following configuration:
+  const successDatabase = `
+    SUCCESS PATTERNS (Trends 2024-2025):
+    - J-Pop: High-pitched catchy hooks, piano-driven fast tempo (160-180 BPM), emotional "bridge" transitions.
+    - Anime Style: Story-driven lyrics, fast rhythmic articulation (YOASOBI/Ado style), mix of orchestral strings and rock.
+    - Chill/Lo-Fi: Relatable, intimate "daily life" lyrics, slow grooves, nostalgic chord progressions.
+    - Viral TikTok: 15-30s powerful "hook" sections, danceable beats, simple but catchy repetition.
+  `;
+
+  const prompt = `You are a world-class music producer and viral content strategist. 
+Based on successful trends from SunoAI and Udio, generate a song that has high viral potential.
+
+${successDatabase}
+
+Configuration:
 Genres: ${config.genres.join(", ")}
 Mood: ${config.mood}
 Tempo: ${config.tempo} (BPM: ${config.bpm})
@@ -86,7 +99,16 @@ Instruments: (e.g., Piano, Electric Guitar, Drums)
 [Lyrics]
 (The actual song lyrics in ${targetLang})
 
-Generate the song now:`;
+[Viral Analysis]
+(Breakdown your prediction in JSON-like format:)
+Score: (Total 0-100)
+Melody: (0-100)
+Empathy: (0-100)
+Trend: (0-100)
+Market: (One sentence about current trend)
+Suggestions: (List 2-3 specific ways to increase the score)
+
+Generate the song and analysis now:`;
 
   const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
     method: "POST",

@@ -127,11 +127,34 @@ export default function Index() {
     const bpmMatch = text.match(/BPM:\s*(\d+)/i);
     const keyMatch = text.match(/Key:\s*([A-Ga-g][#b]?\s*(?:major|minor|maj|min)?)/i);
     const instrMatch = text.match(/Instruments?:\s*(.*?)(?:\n|$)/i);
-    const lyricsMatch = text.match(/\[LYRICS?\]\s*([\s\S]*)/i)
-      || text.match(/歌詞[：:]\s*([\s\S]*)/i);
+    const lyricsMatch = text.match(/\[LYRICS?\]\s*([\s\S]*?)(?:\n\[|$)/i)
+      || text.match(/歌詞[：:]\s*([\s\S]*?)(?:\n\[|$)/i);
+    const viralMatch = text.match(/\[VIRAL\s*ANALYSIS\]\s*([\s\S]*)/i);
 
     const genreLabels = cfg.genres.map((g) => GENRES.find((x) => x.id === g)?.labelEn || g);
     const moodLabel = MOODS.find((m) => m.id === cfg.mood)?.labelEn || cfg.mood;
+
+    let viralAnalysis = undefined;
+    if (viralMatch) {
+      const vText = viralMatch[1];
+      const score = parseInt(vText.match(/Score:\s*(\d+)/i)?.[1] || "0");
+      const melody = parseInt(vText.match(/Melody:\s*(\d+)/i)?.[1] || "0");
+      const empathy = parseInt(vText.match(/Empathy:\s*(\d+)/i)?.[1] || "0");
+      const trend = parseInt(vText.match(/Trend:\s*(\d+)/i)?.[1] || "0");
+      const market = vText.match(/Market:\s*(.*?)(?:\n|$)/i)?.[1]?.trim() || "";
+      const suggestions = vText.match(/Suggestions:\s*([\s\S]*)/i)?.[1]
+        ?.split("\n")
+        .map(s => s.replace(/^[-*•\s\d.]+\s*/, "").trim())
+        .filter(s => s !== "")
+        .slice(0, 3) || [];
+
+      viralAnalysis = {
+        score,
+        breakdown: { melody, empathy, trend },
+        marketTrend: market,
+        suggestions
+      };
+    }
 
     return {
       styleTags: styleMatch?.[1]?.trim() || `[${genreLabels.join(", ")}, ${moodLabel.toLowerCase()}]`,
@@ -140,7 +163,8 @@ export default function Index() {
         key: keyMatch?.[1]?.trim() || "C major",
         instruments: instrMatch?.[1]?.trim() || genreLabels.join(", ") + " instruments",
       },
-      lyrics: lyricsMatch?.[1]?.trim() || text,
+      lyrics: lyricsMatch?.[1]?.trim() || text.split(/\[VIRAL/i)[0].trim(),
+      viralAnalysis,
     };
   };
 

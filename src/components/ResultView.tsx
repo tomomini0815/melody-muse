@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { refineLyrics as refineLyricsApi } from "@/lib/stream-chat";
+import { ViralPredictor } from "./ViralPredictor";
 
 interface Props {
   prompt: GeneratedPrompt;
@@ -282,74 +283,80 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
         </div>
 
         {/* Lyrics */}
-        <div className="glass rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-primary">歌詞</h3>
-            <div className="flex items-center gap-1">
-              <Popover open={isRefinePopoverOpen} onOpenChange={setIsRefinePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" disabled={isRefiningLyrics || isStreaming} className="h-8 px-2 glass gap-1.5" title="歌詞をブラッシュアップ">
-                    {isRefiningLyrics ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    <span className="text-[10px] sm:text-xs">ブラッシュアップ</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 glass border-primary/20 p-4">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-sm leading-none">歌詞への指示</h4>
-                      <p className="text-xs text-muted-foreground">
-                        「もっと韻を踏んで」「サビをドラマチックに」など、AIへの要望を入力してください。
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="例：もっとエモーショナルにして"
-                        value={refinementFeedback}
-                        onChange={(e) => setRefinementFeedback(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleRefineLyrics()}
-                        className="bg-transparent border-primary/20 h-9"
-                      />
-                      <Button size="sm" onClick={handleRefineLyrics} disabled={isRefiningLyrics}>
-                        実行
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" disabled={isTranslating || isStreaming} className="h-8 px-2 glass gap-1.5" title="言語を変更">
-                    {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LanguagesIcon className="w-3.5 h-3.5" />}
-                    <span className="text-[10px] sm:text-xs">翻訳</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 glass border-primary/20">
-                  {LANGUAGES.map((lang) => (
-                    <DropdownMenuItem
-                      key={lang.id}
-                      onClick={() => handleTranslate(lang.id)}
-                      className="gap-2 cursor-pointer hover:bg-primary/10"
-                    >
-                      <span>{lang.icon}</span>
-                      <span>{lang.label}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <CopyBtn text={prompt.lyrics} label="歌詞" />
-            </div>
-          </div>
-          <Textarea
-            value={prompt.lyrics}
-            onChange={(e) => onUpdateLyrics(e.target.value)}
-            className="min-h-[500px] bg-transparent border-none resize-none text-sm leading-relaxed focus-visible:ring-0 text-foreground/90 font-sans"
-            disabled={isStreaming}
-          />
-        </div>
-      </div>
+        <div className="space-y-6">
+          {prompt.viralAnalysis && (
+            <ViralPredictor analysis={prompt.viralAnalysis} />
+          )}
 
-      {/* MV Generator Modal */}
-      <MVGeneratorModal prompt={prompt} open={isMVOpen} onOpenChange={setIsMVOpen} />
+          <div className="glass rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-primary">歌詞</h3>
+              <div className="flex items-center gap-1">
+                <Popover open={isRefinePopoverOpen} onOpenChange={setIsRefinePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" disabled={isRefiningLyrics || isStreaming} className="h-8 px-2 glass gap-1.5" title="歌詞をブラッシュアップ">
+                      {isRefiningLyrics ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      <span className="text-[10px] sm:text-xs">ブラッシュアップ</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 glass border-primary/20 p-4">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm leading-none">歌詞への指示</h4>
+                        <p className="text-xs text-muted-foreground">
+                          「もっと韻を踏んで」「サビをドラマチックに」など、AIへの要望を入力してください。
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="例：もっとエモーショナルにして"
+                          value={refinementFeedback}
+                          onChange={(e) => setRefinementFeedback(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleRefineLyrics()}
+                          className="bg-transparent border-primary/20 h-9"
+                        />
+                        <Button size="sm" onClick={handleRefineLyrics} disabled={isRefiningLyrics}>
+                          実行
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" disabled={isTranslating || isStreaming} className="h-8 px-2 glass gap-1.5" title="言語を変更">
+                      {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LanguagesIcon className="w-3.5 h-3.5" />}
+                      <span className="text-[10px] sm:text-xs">翻訳</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40 glass border-primary/20">
+                    {LANGUAGES.map((lang) => (
+                      <DropdownMenuItem
+                        key={lang.id}
+                        onClick={() => handleTranslate(lang.id)}
+                        className="gap-2 cursor-pointer hover:bg-primary/10"
+                      >
+                        <span>{lang.icon}</span>
+                        <span>{lang.label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <CopyBtn text={prompt.lyrics} label="歌詞" />
+              </div>
+            </div>
+            <Textarea
+              value={prompt.lyrics}
+              onChange={(e) => onUpdateLyrics(e.target.value)}
+              className="min-h-[500px] bg-transparent border-none resize-none text-sm leading-relaxed focus-visible:ring-0 text-foreground/90 font-sans"
+              disabled={isStreaming}
+            />
+          </div>
+        </div>
+
+        {/* MV Generator Modal */}
+        <MVGeneratorModal prompt={prompt} open={isMVOpen} onOpenChange={setIsMVOpen} />
+      </div>
     </div>
   );
 }

@@ -33,6 +33,17 @@ export interface MusicConfig {
   artist?: string; // Artist ID
 }
 
+export interface ViralAnalysis {
+  score: number; // 0-100
+  breakdown: {
+    melody: number; // キャッチーメロディ要素
+    empathy: number; // 歌詞の共感性
+    trend: number; // ジャンルトレンド適合
+  };
+  marketTrend: string; // 「このジャンルは今週トレンド+15%」など
+  suggestions: string[]; // 💡改善提案
+}
+
 export interface GeneratedPrompt {
   id: string;
   lyrics: string;
@@ -47,6 +58,7 @@ export interface GeneratedPrompt {
   isFavorite: boolean;
   coverUrl?: string;
   originalPrompt?: string;
+  viralAnalysis?: ViralAnalysis;
 }
 
 export const GENRES: Genre[] = [
