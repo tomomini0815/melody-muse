@@ -1,0 +1,39 @@
+﻿20c6d67 refactor: implement defensive streaming and error handling for Gemini API
+46ca7d7 fix: resolve model 404 error by switching to available gemini-2.0-flash model
+f338576 chore: trigger deployment with dummy comment
+906e39e fix: enhance Gemini API retry logic and improve security by hiding API key from URL logs
+38671fd feat: switch back to gemini-2.5-flash-lite as requested
+77c6ff9 fix: revert to stable gemini model and enhance retry strategy to mitigate 429 errors
+38e7002 feat: improve viral predictor parser and add auto-optimization feature
+4720b21 feat: add viral success prediction and analysis feature
+cbbf198 fix: add fallback image provider when Pollinations.ai is down
+15d7d82 feat: enhance cinematic MV with HD resolution, Ken Burns variety, post-effects, and scene count selection
+04459de feat: add lyrics refinement feature
+28497b1 fix: finalize gemini stabilization with 2.5-flash-lite
+1f54f4f fix: switch to stable gemini-2.0-flash-lite to resolve 404 error
+850f7e6 fix: switch to stable gemini-1.5-flash model
+9b39b97 fix: restore multi-language translation support
+25aa31c security: hide .env and update .gitignore
+9ddb14e revert: restore clean post-implementation state of MV features
+5ed09b3 feat: implement MV generation and improve AI stability (cinematic MV in dev)
+79a9bef fix: implement line buffering for stream parsing and increase max tokens to 4096
+74e85f0 feat: switch to gemini-2.5-flash for better free tier availability
+8deb660 feat: complete migrate all gemini calls to fetchWithRetry and use 2.0-flash-lite
+c96ede2 feat: enhance retry logic with longer waits and switch to 2.0-flash-lite
+069cae0 feat: implement exponential backoff retry for Gemini API 429 errors
+1bdd71d fix: update gemini model to 2.0-flash for better compatibility
+48fb5a4 fix: switch to gemini-1.5-flash to resolve quota exceeded error
+7f0664a feat: refine UI, add Mureka integration, and include metadata in AI prompts
+92fb35a feat: implement multilingual lyrics support and UI refinements
+8c7187b feat: Gemini API逶ｴ謗･蜻ｼ縺ｳ蜃ｺ縺励↓遘ｻ陦・- 逕ｻ蜒冗函謌・Gemini+Imagen)縲√ヶ繝ｩ繝・す繝･繧｢繝・・(繧ｿ繧ｰ霑ｽ蜉繝槭・繧ｸ)縲√Δ繝・Ν繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ蠑ｷ蛹・30aa335 Switch prompt refinement to direct Google Gemini API call in frontend
+eec902b Fix CORS error by moving prompt refinement to Supabase Edge Function
+4f0ccbc Add Original Prompt section with AI brush-up feature
+f5310dd Refine artist selection UI: new tab design and remove search box
+092eb00 Enhance artist selection with search-to-add flow and better status feedback
+7c79434 Implement custom artist input feature with interaction logic
+a3348e1 Improve Artist Style UI with Search/Tabs and implement logo navigation to home
+781fb4e Refine ResultView UI, fix CORS in Edge Function, and update Suno button styling
+315bd8e feat: improve mobile graph UI, refine header button layout, and expand Japanese artist styles
+ced98ee UI: Complete mobile responsive overhaul for all pages
+c134de4 Final polish: Optimized analysis distribution and Suno AI prompt generator UI
+f22a0ba Add CSV export functionality to Audio Analysis Studio

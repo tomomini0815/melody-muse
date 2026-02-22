@@ -1,5 +1,4 @@
 import { Language, LANGUAGES } from "./types";
-// Deployment trigger: 2026-02-22T21:50
 
 /**
  * Helper to fetch with exponential backoff for 429 errors
@@ -7,41 +6,25 @@ import { Language, LANGUAGES } from "./types";
 async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5): Promise<Response> {
   let retries = 0;
   while (true) {
-    try {
-      const resp = await fetch(url, options);
+    const resp = await fetch(url, options);
 
-      // Retry for 429 (Quota) and 5xx (Server errors)
-      if ((resp.status === 429 || resp.status >= 500) && retries < maxRetries) {
-        const waitTime = Math.pow(2, retries) * 5000 + Math.random() * 1000;
-        console.warn(`Gemini API ${resp.status} detected. Retrying in ${Math.round(waitTime / 1000)}s... (${retries + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        retries++;
-        continue;
-      }
-
-      return resp;
-    } catch (err) {
-      if (retries < maxRetries) {
-        console.warn("Network error. Retrying in 2s...", err);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        retries++;
-        continue;
-      }
-      throw err;
+    if (resp.status === 429 && retries < maxRetries) {
+      // Starting with 5s backoff for standard rate limits.
+      const waitTime = Math.pow(2, retries) * 5000 + Math.random() * 1000;
+      console.warn(`Gemini API 429 detected. Retrying in ${Math.round(waitTime / 1000)}s... (Attempt ${retries + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      retries++;
+      continue;
     }
+
+    return resp;
   }
 }
 
-function getGeminiConfig() {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
-  const model = "gemini-2.0-flash-lite"; // Most stable for free tier
-  return {
-    key,
-    model,
-    streamUrl: `https://generativelanguage.googleapis.com/v1/models/${model}:streamGenerateContent?key=${key}&alt=sse`,
-    postUrl: `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key}`
-  };
-}
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
+const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 export interface GenerateRequest {
   genres: string[];
@@ -80,20 +63,7 @@ export async function generateLyrics(
   };
   const targetLang = langMap[config.language] || "Japanese";
 
-  const successDatabase = `
-    SUCCESS PATTERNS (Trends 2024-2025):
-    - J-Pop: High-pitched catchy hooks, piano-driven fast tempo (160-180 BPM), emotional "bridge" transitions.
-    - Anime Style: Story-driven lyrics, fast rhythmic articulation (YOASOBI/Ado style), mix of orchestral strings and rock.
-    - Chill/Lo-Fi: Relatable, intimate "daily life" lyrics, slow grooves, nostalgic chord progressions.
-    - Viral TikTok: 15-30s powerful "hook" sections, danceable beats, simple but catchy repetition.
-  `;
-
-  const prompt = `You are a world-class music producer and viral content strategist. 
-Based on successful trends from SunoAI and Udio, generate a song that has high viral potential.
-
-${successDatabase}
-
-Configuration:
+  const prompt = `You are a professional music producer and songwriter. Generate a song based on the following configuration:
 Genres: ${config.genres.join(", ")}
 Mood: ${config.mood}
 Tempo: ${config.tempo} (BPM: ${config.bpm})
@@ -116,27 +86,17 @@ Instruments: (e.g., Piano, Electric Guitar, Drums)
 [Lyrics]
 (The actual song lyrics in ${targetLang})
 
-[Viral Analysis]
-(Breakdown your prediction in JSON-like format:)
-Score: (Total 0-100)
-Melody: (0-100)
-Empathy: (0-100)
-Trend: (0-100)
-Market: (One sentence about current trend)
-Suggestions: (List 2-3 specific ways to increase the score)
+Generate the song now:`;
 
-Generate the song and analysis now:`;
-
-  const { key, streamUrl } = getGeminiConfig();
-  if (!key) throw new Error("APIキーが設定されていません。.envファイルを確認してください。");
-
-  const resp = await fetchWithRetry(streamUrl, {
+  const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
         maxOutputTokens: 4096,
       }
     }),
@@ -179,19 +139,6 @@ Generate the song and analysis now:`;
     }
   }
 
-  // Process any remaining partial line in buffer if we're done
-  const finalTrimmed = lineBuffer.trim();
-  if (finalTrimmed.startsWith("data: ")) {
-    try {
-      const data = JSON.parse(finalTrimmed.slice(6));
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (content) {
-        fullText += content;
-        onDelta(content);
-      }
-    } catch (e) { }
-  }
-
   onDone();
   return fullText;
 }
@@ -217,14 +164,13 @@ ${lyrics}
 TARGET LANGUAGE: ${targetName}
 TRANSLATED LYRICS:`;
 
-  const { postUrl } = getGeminiConfig();
-  const resp = await fetchWithRetry(postUrl, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.3,
+        temperature: 0.3, // Lower temperature for more accurate translation
       }
     }),
   });
@@ -251,8 +197,7 @@ Style Tags: ${styleTags}
 
 Output ONLY the descriptive prompt in English. No other text.`;
 
-  const { postUrl } = getGeminiConfig();
-  const resp = await fetchWithRetry(postUrl, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -333,8 +278,7 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 
   onProgress?.(5);
 
-  const { postUrl } = getGeminiConfig();
-  const resp = await fetchWithRetry(postUrl, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -364,44 +308,19 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 
   onProgress?.(20);
 
-  // 2. Generate image URLs with fallback strategy
-  //    Primary: Pollinations.ai (AI-generated from prompt)
-  //    Fallback: picsum.photos (curated photography, mood-matched)
+  // 2. Generate image URLs for each scene using Pollinations.ai
   const imageUrls: string[] = [];
-  let pollinationsAvailable = true;
-
-  // Quick availability check for Pollinations.ai
-  try {
-    const testResp = await fetch(
-      `https://image.pollinations.ai/prompt/${encodeURIComponent("test")}?width=64&height=64&nologo=true`,
-      { method: "HEAD", signal: AbortSignal.timeout(5000) }
-    );
-    if (!testResp.ok) pollinationsAvailable = false;
-  } catch {
-    pollinationsAvailable = false;
-  }
-
-  console.log(`[MV] Image provider: ${pollinationsAvailable ? "Pollinations.ai" : "picsum.photos (fallback)"}`);
-
   for (let i = 0; i < Math.min(sceneDescs.length, sceneCount); i++) {
     const cleanPrompt = sceneDescs[i]
       .replace(/^["'`\s]+|["'`\s]+$/g, "")
       .replace(/```[a-z]*\n?|```/g, "")
       .trim();
 
-    let url: string;
-    if (pollinationsAvailable) {
-      // Primary: Pollinations.ai with enhanced prompt
-      const fullPrompt = `${styleBoost}, ${cleanPrompt}, masterpiece, best quality, ultra detailed, 8k resolution, no text, no watermark`;
-      const encodedPrompt = encodeURIComponent(fullPrompt);
-      const seed = Math.floor(Math.random() * 1000000);
-      url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;
-    } else {
-      // Fallback: picsum.photos — random curated photography
-      // Use a unique seed per scene for variety
-      const picsumId = 100 + (i * 73 + Math.floor(Math.random() * 50)) % 900;
-      url = `https://picsum.photos/id/${picsumId}/1280/720`;
-    }
+    // Enhanced prompt with style boost and quality tags
+    const fullPrompt = `${styleBoost}, ${cleanPrompt}, masterpiece, best quality, ultra detailed, 8k resolution, no text, no watermark`;
+    const encodedPrompt = encodeURIComponent(fullPrompt);
+    const seed = Math.floor(Math.random() * 1000000);
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;
     imageUrls.push(url);
 
     onProgress?.(20 + (80 * (i + 1)) / sceneCount);
@@ -417,8 +336,7 @@ Output only the tags separated by commas. Do not include brackets or extra text.
 
 Input Description: ${prompt}`;
 
-  const { postUrl } = getGeminiConfig();
-  const resp = await fetchWithRetry(postUrl, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -453,13 +371,14 @@ CONSTRAINTS:
 
 REFINED LYRICS:`;
 
-  const { postUrl } = getGeminiConfig();
-  const resp = await fetchWithRetry(postUrl, {
+  const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: { temperature: 0.8 }
+      generationConfig: {
+        temperature: 0.8,
+      }
     }),
   });
 
@@ -472,59 +391,4 @@ REFINED LYRICS:`;
   const refined = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!refined) throw new Error("ブラッシュアップ結果が空です。");
   return refined;
-}
-/**
- * バズ予測の解析結果を基に、歌詞を「バズる方向」へ自動調整する
- */
-export async function optimizeLyricsForVirality(
-  currentLyrics: string,
-  analysis: any,
-  styleTags: string,
-  targetLang: string = "Japanese"
-): Promise<string> {
-  const geminiPrompt = `You are a world-class music producer and viral marketing विशेषज्ञ.
-TASK: Optimize the provided lyrics to maximize its viral potential based on the following analysis.
-
-CURRENT LYRICS:
-"""
-${currentLyrics}
-"""
-
-CURRENT VIRAL ANALYSIS:
-- Overall Score: ${analysis.score}%
-- Melody/Catchiness: ${analysis.breakdown.melody}
-- Empathy/Relatability: ${analysis.breakdown.empathy}
-- Trend Alignment: ${analysis.breakdown.trend}
-- Market Trend: ${analysis.marketTrend}
-- AI Suggestions: ${analysis.suggestions.join(", ")}
-
-INSTRUCTIONS:
-1. Rewrite the lyrics to specifically address the "AI Suggestions" and improve the scores.
-2. If Empathy is low, add more relatable, emotional, or "human" storytelling.
-3. If Trend is low, incorporate modern slang, viral-friendly structures (short punchy hooks), or genre-specific keywords (e.g., J-Pop tropes).
-4. Maintain the overall theme and language (${targetLang}).
-5. Output your response in the SAME format as the original generation, including [Style Tags], [Meta], [Lyrics], and a NEW [Viral Analysis].
-6. The NEW Viral Analysis should reflect the improvements you've made. It should aim for 90%+ score.
-
-Generate the OPTIMIZED song and new analysis now:`;
-
-  const { postUrl } = getGeminiConfig();
-  const resp = await fetchWithRetry(postUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: { temperature: 0.85 }
-    }),
-  });
-
-  if (!resp.ok) {
-    const errorBody = await resp.text();
-    console.error("Gemini API Error (Optimize):", resp.status, errorBody);
-    throw new Error(`最適化に失敗しました: ${resp.status}`);
-  }
-  const data = await resp.json();
-  const optimizedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!optimizedText) throw new Error("最適化結果が空です。");
-  return optimizedText;
 }
