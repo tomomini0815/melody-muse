@@ -14,6 +14,7 @@ interface Props {
     styleTags: string;
     coverUrl?: string;
     artStyle?: string;
+    sceneCount?: number;
 }
 
 interface SceneImage {
@@ -22,7 +23,43 @@ interface SceneImage {
     loaded: boolean;
 }
 
-export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artStyle = "cinematic" }: Props) {
+// Ken Burns camera motion types for variety
+type CameraMotion = "zoomIn" | "zoomOut" | "panLeft" | "panRight" | "panUp" | "panDown" | "diagonalTL" | "diagonalBR";
+
+const CAMERA_MOTIONS: CameraMotion[] = [
+    "zoomIn", "zoomOut", "panLeft", "panRight", "panUp", "panDown", "diagonalTL", "diagonalBR"
+];
+
+function getCameraMotionForScene(index: number, sectionType: string): CameraMotion {
+    // Chorus gets more dynamic motions, Verse gets subtle
+    if (sectionType === "chorus" || sectionType === "hook") {
+        const epicMotions: CameraMotion[] = ["zoomIn", "diagonalBR", "panUp", "diagonalTL"];
+        return epicMotions[index % epicMotions.length];
+    }
+    if (sectionType === "bridge" || sectionType === "outro") {
+        const smoothMotions: CameraMotion[] = ["zoomOut", "panLeft", "panDown"];
+        return smoothMotions[index % smoothMotions.length];
+    }
+    return CAMERA_MOTIONS[index % CAMERA_MOTIONS.length];
+}
+
+function getMotionSpeed(sectionType: string): number {
+    switch (sectionType) {
+        case "chorus":
+        case "hook":
+            return 1.6;
+        case "bridge":
+            return 0.7;
+        case "outro":
+            return 0.5;
+        case "intro":
+            return 0.6;
+        default:
+            return 1.0;
+    }
+}
+
+export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artStyle = "cinematic", sceneCount: requestedSceneCount }: Props) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
     const startTimeRef = useRef<number>(0);
@@ -33,10 +70,33 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     const [scenes, setScenes] = useState<SceneImage[]>([]);
     const [progress, setProgress] = useState(0);
     const imagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
+    // Film grain noise canvas
+    const grainCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
     const theme = getVisualTheme(mood);
     const sections = parseLyrics(lyrics, bpm);
     const totalDuration = sections.length > 0 ? sections[sections.length - 1].endTime : 60;
+    const effectiveSceneCount = requestedSceneCount || sections.length;
+
+    // Initialize grain canvas once
+    useEffect(() => {
+        const grain = document.createElement("canvas");
+        grain.width = 256;
+        grain.height = 256;
+        const gCtx = grain.getContext("2d");
+        if (gCtx) {
+            const imageData = gCtx.createImageData(256, 256);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const v = Math.random() * 50;
+                imageData.data[i] = v;
+                imageData.data[i + 1] = v;
+                imageData.data[i + 2] = v;
+                imageData.data[i + 3] = 18; // Subtle grain
+            }
+            gCtx.putImageData(imageData, 0, 0);
+        }
+        grainCanvasRef.current = grain;
+    }, []);
 
     // Generate scene images
     const handleGenerate = async () => {
@@ -47,7 +107,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 lyrics,
                 styleTags,
                 mood,
-                sections.length,
+                effectiveSceneCount,
                 artStyle,
                 (p) => setProgress(p)
             );
@@ -90,13 +150,9 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
         }
     };
 
-    const handlePlayClick = () => {
-        play();
-    };
-
-    // Draw frame
-    function drawFrame(ctx: CanvasRenderingContext2D, w: number, h: number, timeSec: number, elapsed: number) {
-        // Background gradient
+    // ─── Draw a single frame ───
+    function drawFrame(ctx: CanvasRenderingContext2D, w: number, h: number, timeSec: number, _elapsed: number) {
+        // ── Background gradient ──
         const grd = ctx.createLinearGradient(0, 0, w * 0.3, h);
         grd.addColorStop(0, theme.bgGradient[0]);
         grd.addColorStop(0.5, theme.bgGradient[1]);
@@ -104,7 +160,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
         ctx.fillStyle = grd;
         ctx.fillRect(0, 0, w, h);
 
-        // Find current and next scene
+        // ── Find current & next scene ──
         let currentIdx = -1;
         let sectionProgress = 0;
         for (let i = 0; i < sections.length; i++) {
@@ -119,19 +175,69 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
         const currentImg = imagesRef.current.get(currentIdx);
         const nextIdx = Math.min(currentIdx + 1, sections.length - 1);
         const nextImg = imagesRef.current.get(nextIdx);
+        const section = sections[currentIdx];
+        const motion = getCameraMotionForScene(currentIdx, section?.type || "verse");
+        const speed = getMotionSpeed(section?.type || "verse");
 
-        // Ken Burns effect: slow zoom + pan
+        // ── Ken Burns effect with diverse camera motions ──
         if (currentImg) {
             ctx.save();
-            const scale = 1.05 + sectionProgress * 0.1;
-            const panX = Math.sin(timeSec * 0.1 + currentIdx) * 30;
-            const panY = Math.cos(timeSec * 0.08 + currentIdx) * 20;
+            const t = sectionProgress * speed;
 
-            // Cross-fade near section boundary
-            const fadeZone = 0.15; // last 15% of section
+            let scale = 1.0;
+            let panX = 0;
+            let panY = 0;
+
+            switch (motion) {
+                case "zoomIn":
+                    scale = 1.02 + t * 0.12;
+                    panX = Math.sin(timeSec * 0.05) * 15;
+                    panY = Math.cos(timeSec * 0.04) * 10;
+                    break;
+                case "zoomOut":
+                    scale = 1.14 - t * 0.10;
+                    panX = Math.cos(timeSec * 0.06) * 12;
+                    panY = Math.sin(timeSec * 0.05) * 8;
+                    break;
+                case "panLeft":
+                    scale = 1.08;
+                    panX = 40 - t * 80;
+                    panY = Math.sin(timeSec * 0.03) * 6;
+                    break;
+                case "panRight":
+                    scale = 1.08;
+                    panX = -40 + t * 80;
+                    panY = Math.cos(timeSec * 0.03) * 6;
+                    break;
+                case "panUp":
+                    scale = 1.06;
+                    panX = Math.sin(timeSec * 0.04) * 8;
+                    panY = 25 - t * 50;
+                    break;
+                case "panDown":
+                    scale = 1.06;
+                    panX = Math.cos(timeSec * 0.04) * 8;
+                    panY = -25 + t * 50;
+                    break;
+                case "diagonalTL":
+                    scale = 1.04 + t * 0.08;
+                    panX = 30 - t * 60;
+                    panY = 20 - t * 40;
+                    break;
+                case "diagonalBR":
+                    scale = 1.04 + t * 0.08;
+                    panX = -30 + t * 60;
+                    panY = -20 + t * 40;
+                    break;
+            }
+
+            // Cross-fade near section boundary (expanded to 25%)
+            const fadeZone = 0.25;
             let alpha = 1;
             if (sectionProgress > (1 - fadeZone) && nextImg && nextIdx !== currentIdx) {
-                alpha = 1 - (sectionProgress - (1 - fadeZone)) / fadeZone;
+                const fadeProgress = (sectionProgress - (1 - fadeZone)) / fadeZone;
+                // Smooth ease-in-out
+                alpha = 1 - (fadeProgress * fadeProgress * (3 - 2 * fadeProgress));
             }
 
             ctx.globalAlpha = alpha;
@@ -144,89 +250,149 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
             // Draw next image with fade-in
             if (nextImg && alpha < 1) {
                 ctx.globalAlpha = 1 - alpha;
-                const nextScale = 1.0 + (1 - alpha) * 0.05;
+                const nextMotion = getCameraMotionForScene(nextIdx, sections[nextIdx]?.type || "verse");
+                let nextScale = 1.02;
+                if (nextMotion === "zoomOut") nextScale = 1.12;
                 const nw = w * nextScale;
                 const nh = h * nextScale;
                 ctx.drawImage(nextImg, (w - nw) / 2, (h - nh) / 2, nw, nh);
             }
 
             ctx.restore();
+
+            // ── White flash on Chorus entry ──
+            if (section?.type === "chorus" && sectionProgress < 0.06) {
+                ctx.save();
+                const flashAlpha = (1 - sectionProgress / 0.06) * 0.5;
+                ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+                ctx.fillRect(0, 0, w, h);
+                ctx.restore();
+            }
         }
 
-        // Cinematic top/bottom bars
-        ctx.fillStyle = "rgba(0,0,0,0.4)";
-        ctx.fillRect(0, 0, w, h * 0.08);
-        ctx.fillRect(0, h * 0.92, w, h * 0.08);
+        // ── Vignette effect ──
+        const vignetteGrd = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.75);
+        vignetteGrd.addColorStop(0, "rgba(0,0,0,0)");
+        vignetteGrd.addColorStop(0.7, "rgba(0,0,0,0)");
+        vignetteGrd.addColorStop(1, "rgba(0,0,0,0.55)");
+        ctx.fillStyle = vignetteGrd;
+        ctx.fillRect(0, 0, w, h);
 
-        // Lyrics overlay
-        const section = sections[currentIdx];
+        // ── Film grain overlay ──
+        if (grainCanvasRef.current) {
+            ctx.save();
+            ctx.globalAlpha = 0.08;
+            ctx.globalCompositeOperation = "overlay";
+            // Tile the grain pattern with random offset for animation
+            const offX = Math.random() * 256;
+            const offY = Math.random() * 256;
+            for (let gx = -256; gx < w + 256; gx += 256) {
+                for (let gy = -256; gy < h + 256; gy += 256) {
+                    ctx.drawImage(grainCanvasRef.current, gx + offX, gy + offY);
+                }
+            }
+            ctx.restore();
+        }
+
+        // ── Cinematic letterbox bars ──
+        const barH = h * 0.065;
+        ctx.fillStyle = "rgba(0,0,0,0.85)";
+        ctx.fillRect(0, 0, w, barH);
+        ctx.fillRect(0, h - barH, w, barH);
+
+        // ── Lyrics overlay ──
         if (section) {
             const lineCount = section.lines.length;
-            const fontSize = Math.min(26, Math.max(16, 500 / lineCount));
-            const lineHeight = fontSize * 1.7;
-            const startY = h * 0.75 - (lineCount * lineHeight) / 2;
+            const isChorus = section.type === "chorus" || section.type === "hook";
+            const baseFontSize = isChorus
+                ? Math.min(34, Math.max(22, 600 / lineCount))
+                : Math.min(28, Math.max(16, 500 / lineCount));
+            const lineHeight = baseFontSize * 1.8;
+            const startY = h * 0.72 - (lineCount * lineHeight) / 2;
 
-            // Semi-transparent background for text (enhanced for readability)
+            // Semi-transparent text background (softer)
             ctx.save();
-            ctx.fillStyle = "rgba(0,0,0,0.6)";
-            const textAreaTop = startY - fontSize * 1.5;
-            const textAreaHeight = lineCount * lineHeight + fontSize * 2.5;
-            ctx.fillRect(0, textAreaTop, w, textAreaHeight);
+            const textBgGrd = ctx.createLinearGradient(0, startY - baseFontSize * 2, 0, startY + lineCount * lineHeight + baseFontSize);
+            textBgGrd.addColorStop(0, "rgba(0,0,0,0)");
+            textBgGrd.addColorStop(0.15, "rgba(0,0,0,0.55)");
+            textBgGrd.addColorStop(0.85, "rgba(0,0,0,0.55)");
+            textBgGrd.addColorStop(1, "rgba(0,0,0,0)");
+            ctx.fillStyle = textBgGrd;
+            ctx.fillRect(0, startY - baseFontSize * 2, w, lineCount * lineHeight + baseFontSize * 3);
             ctx.restore();
 
             for (let i = 0; i < lineCount; i++) {
-                const lineProgress = Math.max(0, Math.min(1, (sectionProgress * lineCount - i) * 2));
+                const lineProgress = Math.max(0, Math.min(1, (sectionProgress * lineCount - i) * 1.8));
                 if (lineProgress <= 0) continue;
 
                 const y = startY + i * lineHeight;
+                // Cubic ease-out
                 const ease = 1 - Math.pow(1 - lineProgress, 3);
+                // Slide-up from below
+                const slideOffset = (1 - ease) * 25;
 
                 ctx.save();
                 ctx.globalAlpha = ease;
                 ctx.fillStyle = "#ffffff";
-                ctx.font = `bold ${fontSize}px 'Inter', 'Noto Sans JP', sans-serif`;
+                const fontWeight = isChorus ? "800" : "bold";
+                ctx.font = `${fontWeight} ${baseFontSize}px 'Inter', 'Noto Sans JP', sans-serif`;
                 ctx.textAlign = "center";
 
-                // Enhanced text visibility
-                ctx.shadowColor = "rgba(0,0,0,0.95)";
-                ctx.shadowBlur = 15;
-                ctx.shadowOffsetX = 2;
+                // Glow effect matching mood accent color
+                ctx.shadowColor = isChorus ? theme.accentColor : "rgba(0,0,0,0.95)";
+                ctx.shadowBlur = isChorus ? 25 : 12;
+                ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 2;
 
-                // Subtle outline
-                ctx.strokeStyle = "rgba(0,0,0,0.5)";
-                ctx.lineWidth = 1.5;
-                ctx.strokeText(section.lines[i], w / 2, y);
+                // Text stroke for readability
+                ctx.strokeStyle = "rgba(0,0,0,0.6)";
+                ctx.lineWidth = isChorus ? 2.5 : 1.5;
+                ctx.strokeText(section.lines[i], w / 2, y + slideOffset);
 
-                ctx.fillText(section.lines[i], w / 2, y);
+                ctx.fillText(section.lines[i], w / 2, y + slideOffset);
+
+                // Secondary glow pass for Chorus
+                if (isChorus && lineProgress > 0.5) {
+                    ctx.globalAlpha = ease * 0.3;
+                    ctx.shadowBlur = 40;
+                    ctx.shadowColor = theme.accentColor;
+                    ctx.fillText(section.lines[i], w / 2, y + slideOffset);
+                }
+
                 ctx.restore();
             }
 
-            // Section label
+            // ── Section label (top-left) ──
             ctx.save();
-            ctx.globalAlpha = 0.6;
+            ctx.globalAlpha = 0.7;
             ctx.fillStyle = theme.accentColor;
-            ctx.font = `bold 12px 'Inter', sans-serif`;
+            ctx.font = `600 11px 'Inter', sans-serif`;
             ctx.textAlign = "left";
-            ctx.fillText(section.label.toUpperCase(), 20, h * 0.06);
+            ctx.letterSpacing = "2px";
+            ctx.fillText(`▸ ${section.label.toUpperCase()}`, 24, barH + 18);
             ctx.restore();
         }
 
-        // Progress bar
+        // ── Progress bar ──
         ctx.save();
-        ctx.fillStyle = "rgba(255,255,255,0.15)";
-        ctx.fillRect(0, h - 3, w, 3);
-        ctx.fillStyle = theme.accentColor;
-        ctx.fillRect(0, h - 3, w * (timeSec / totalDuration), 3);
+        const progressY = h - 2;
+        ctx.fillStyle = "rgba(255,255,255,0.12)";
+        ctx.fillRect(0, progressY, w, 2);
+        // Gradient progress
+        const progressGrd = ctx.createLinearGradient(0, 0, w * (timeSec / totalDuration), 0);
+        progressGrd.addColorStop(0, theme.accentColor);
+        progressGrd.addColorStop(1, "#ffffff");
+        ctx.fillStyle = progressGrd;
+        ctx.fillRect(0, progressY, w * (timeSec / totalDuration), 2);
         ctx.restore();
 
-        // Watermark
+        // ── Watermark ──
         ctx.save();
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = 0.2;
         ctx.fillStyle = "#ffffff";
-        ctx.font = "11px 'Inter', sans-serif";
+        ctx.font = "10px 'Inter', sans-serif";
         ctx.textAlign = "right";
-        ctx.fillText("Melody Muse ♪", w - 15, h * 0.05);
+        ctx.fillText("Melody Muse ♪", w - 20, barH - 4);
         ctx.restore();
     }
 
@@ -270,7 +436,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
             const stream = canvas.captureStream(30);
             const recorder = new MediaRecorder(stream, {
                 mimeType: "video/webm;codecs=vp9",
-                videoBitsPerSecond: 8_000_000,
+                videoBitsPerSecond: 12_000_000,
             });
             const chunks: Blob[] = [];
             recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
@@ -279,7 +445,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = `melody-muse-mv-cinematic-${Date.now()}.webm`;
+                a.download = `melody-muse-cinematic-mv-${Date.now()}.webm`;
                 a.click();
                 URL.revokeObjectURL(url);
                 setIsExporting(false);
@@ -311,22 +477,22 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        canvas.width = 960;
-        canvas.height = 540;
+        canvas.width = 1280;
+        canvas.height = 720;
         const ctx = canvas.getContext("2d");
         if (ctx) {
-            const grd = ctx.createLinearGradient(0, 0, 960 * 0.3, 540);
+            const grd = ctx.createLinearGradient(0, 0, 1280 * 0.3, 720);
             grd.addColorStop(0, theme.bgGradient[0]);
             grd.addColorStop(0.5, theme.bgGradient[1]);
             grd.addColorStop(1, theme.bgGradient[2]);
             ctx.fillStyle = grd;
-            ctx.fillRect(0, 0, 960, 540);
+            ctx.fillRect(0, 0, 1280, 720);
 
             // Placeholder text
             ctx.fillStyle = "rgba(255,255,255,0.3)";
-            ctx.font = "16px 'Inter', sans-serif";
+            ctx.font = "18px 'Inter', sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText(scenes.length > 0 ? "▶ 再生ボタンを押してください" : "🎨 「シーン生成」でAI画像を作成", 480, 270);
+            ctx.fillText(scenes.length > 0 ? "▶ 再生ボタンを押してください" : "🎨 「シーン生成」でAI画像を作成", 640, 360);
         }
         return () => cancelAnimationFrame(animFrameRef.current);
     }, [theme, scenes.length]);
@@ -357,9 +523,29 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                     </div>
                 )}
 
+                {/* Scene thumbnails */}
+                {scenes.length > 0 && !isPlaying && !isGenerating && (
+                    <div className="absolute bottom-14 left-0 right-0 px-3">
+                        <div className="flex gap-1 justify-center overflow-x-auto pb-1">
+                            {scenes.filter(s => s.loaded).slice(0, 10).map((scene, i) => (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        "w-14 h-8 rounded border overflow-hidden shrink-0 opacity-70 hover:opacity-100 transition-opacity cursor-pointer",
+                                        currentIdx(i, currentTime) ? "border-primary opacity-100 ring-1 ring-primary" : "border-white/20"
+                                    )}
+                                    title={scene.section.label}
+                                >
+                                    <img src={scene.url} alt="" className="w-full h-full object-cover" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Play button */}
                 {!isPlaying && !isGenerating && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm transition-all cursor-pointer" onClick={handlePlayClick}>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-sm transition-all cursor-pointer" onClick={() => play()}>
                         <div className={cn(
                             "w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110",
                             scenes.length > 0 ? "bg-primary/80 shadow-primary/30" : "bg-muted/50 border border-white/20"
@@ -431,4 +617,11 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
             </div>
         </div>
     );
+
+    // Helper: check if scene index is current
+    function currentIdx(idx: number, time: number): boolean {
+        const sec = sections[idx];
+        if (!sec) return false;
+        return time >= sec.startTime && time < sec.endTime;
+    }
 }

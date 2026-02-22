@@ -224,6 +224,19 @@ Output ONLY the descriptive prompt in English. No other text.`;
 }
 
 /**
+ * アートスタイル別のプロンプト補強マッピング
+ */
+const ART_STYLE_PROMPTS: Record<string, string> = {
+  "cinematic": "cinematic film still, 35mm anamorphic lens, shallow depth of field, dramatic volumetric lighting, filmic color grading, lens flare",
+  "anime": "anime art style, Studio Ghibli inspired, vibrant cel shading, detailed anime background, soft ambient lighting, beautiful anime scenery",
+  "cyberpunk": "cyberpunk aesthetic, neon-lit cityscape, holographic displays, rain-slicked streets, cyan and magenta lighting, blade runner style",
+  "3d-render": "high quality 3D render, octane render, unreal engine 5, volumetric fog, ray-traced global illumination, photorealistic materials, subsurface scattering",
+  "oil-painting": "masterful oil painting style, visible brushstrokes, rich impasto texture, classical composition, chiaroscuro lighting, museum quality fine art",
+  "pixel-art": "detailed pixel art, 16-bit retro game aesthetic, dithering effects, limited color palette, nostalgic video game scene, crisp pixels",
+  "vaporwave": "vaporwave aesthetic, pastel pink and cyan gradient, retro 80s, marble statues, palm trees, grid landscape, VHS glitch effect, sunset hues",
+};
+
+/**
  * MVシーン画像を生成する。歌詞セクションごとにシーン記述→画像URLを生成。
  */
 export async function generateMVSceneImages(
@@ -234,26 +247,33 @@ export async function generateMVSceneImages(
   artStyle: string = "cinematic",
   onProgress?: (percent: number) => void
 ): Promise<string[]> {
+  const styleBoost = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS["cinematic"];
+
   // 1. Generate scene descriptions using Gemini
-  const geminiPrompt = `You are a cinematographer creating a music video storyboard.
-Based on the lyrics and style, create ${sceneCount} visual scene descriptions for a music video.
+  const geminiPrompt = `You are an award-winning music video director and cinematographer.
+Create ${sceneCount} breathtaking visual scene descriptions for a premium music video.
 
-Art Style Requirement: ${artStyle}
-Music Style: ${styleTags}
-Mood: ${mood}
+ARTISTIC DIRECTION:
+- Art Style: ${artStyle} — ${styleBoost}
+- Music Genre & Style: ${styleTags}
+- Emotional Mood: ${mood}
 
-Lyrics:
+LYRICS:
 """
-${lyrics.substring(0, 1500)}
+${lyrics.substring(0, 2000)}
 """
 
-For each scene, output a short (30-40 word) visual description in English that could be used as an image generation prompt.
-Focus on: visual composition, lighting, color palette, camera angle, artistic style (${artStyle}).
-Do NOT include any text/letters/words in the scenes.
+INSTRUCTIONS:
+- Each scene description should be 40-60 words, highly detailed and vivid.
+- Describe the VISUAL COMPOSITION precisely: camera angle (close-up, wide shot, aerial, dutch angle), lighting (golden hour, neon, moonlight, backlit silhouette), color palette, atmosphere, and key visual elements.
+- Match emotional intensity to the lyrics: Verses should feel intimate and atmospheric, Choruses should feel epic and expansive, Bridges should feel transformative.
+- Create visual CONTINUITY between scenes — they should feel like one cohesive story.
+- Do NOT include any text, letters, words, or typography in ANY scene.
+- Each scene must be unique — no repeated compositions.
 
-Output format - each scene on a new line, numbered 1-${sceneCount}:
-1. [description]
-2. [description]
+Output format — each scene on its own line, numbered 1-${sceneCount}:
+1. [detailed visual description]
+2. [detailed visual description]
 ...`;
 
   onProgress?.(5);
@@ -263,7 +283,7 @@ Output format - each scene on a new line, numbered 1-${sceneCount}:
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
-      generationConfig: { temperature: 0.8 }
+      generationConfig: { temperature: 0.85 }
     }),
   });
 
@@ -283,7 +303,7 @@ Output format - each scene on a new line, numbered 1-${sceneCount}:
 
   // Ensure we have enough scenes
   while (sceneDescs.length < sceneCount) {
-    sceneDescs.push(sceneDescs[sceneDescs.length - 1] || "abstract cinematic visual, moody lighting, atmospheric");
+    sceneDescs.push(sceneDescs[sceneDescs.length - 1] || "abstract cinematic visual, moody lighting, atmospheric, volumetric fog");
   }
 
   onProgress?.(20);
@@ -296,9 +316,11 @@ Output format - each scene on a new line, numbered 1-${sceneCount}:
       .replace(/```[a-z]*\n?|```/g, "")
       .trim();
 
-    const encodedPrompt = encodeURIComponent(`${artStyle} style, ${cleanPrompt}, high quality, detailed, filmic, no text`);
+    // Enhanced prompt with style boost and quality tags
+    const fullPrompt = `${styleBoost}, ${cleanPrompt}, masterpiece, best quality, ultra detailed, 8k resolution, no text, no watermark`;
+    const encodedPrompt = encodeURIComponent(fullPrompt);
     const seed = Math.floor(Math.random() * 1000000);
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=960&height=540&seed=${seed}&nologo=true`;
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;
     imageUrls.push(url);
 
     onProgress?.(20 + (80 * (i + 1)) / sceneCount);

@@ -9,7 +9,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, Film, Palette } from "lucide-react";
+import { Sparkles, Film, Palette, Layers } from "lucide-react";
 import {
     Select,
     SelectContent,
@@ -34,9 +34,16 @@ const MV_STYLES = [
     { id: "vaporwave", label: "ヴェイパーウェイヴ", icon: "🌸" },
 ];
 
+const SCENE_COUNTS = [
+    { value: 6, label: "6シーン", desc: "コンパクト" },
+    { value: 8, label: "8シーン", desc: "標準" },
+    { value: 12, label: "12シーン", desc: "高密度" },
+];
+
 export function MVGeneratorModal({ prompt, open, onOpenChange }: Props) {
     const [activeTab, setActiveTab] = useState("animation");
     const [artStyle, setArtStyle] = useState("cinematic");
+    const [sceneCount, setSceneCount] = useState(8);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,28 +81,49 @@ export function MVGeneratorModal({ prompt, open, onOpenChange }: Props) {
                     </TabsContent>
 
                     <TabsContent value="cinematic" className="mt-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                             <p className="text-xs text-muted-foreground">
                                 各セクションごとにAI画像を生成し、映画的なMVを作ります。
                             </p>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
-                                    <Palette className="w-3 h-3" />
-                                    スタイル:
-                                </span>
-                                <Select value={artStyle} onValueChange={setArtStyle}>
-                                    <SelectTrigger className="w-[140px] h-8 text-xs glass border-primary/20">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="glass border-primary/20">
-                                        {MV_STYLES.map((style) => (
-                                            <SelectItem key={style.id} value={style.id} className="text-xs focus:bg-primary/20 cursor-pointer">
-                                                {style.icon} {style.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
+                                        <Palette className="w-3 h-3" />
+                                        スタイル:
+                                    </span>
+                                    <Select value={artStyle} onValueChange={setArtStyle}>
+                                        <SelectTrigger className="w-[140px] h-8 text-xs glass border-primary/20">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="glass border-primary/20">
+                                            {MV_STYLES.map((style) => (
+                                                <SelectItem key={style.id} value={style.id} className="text-xs focus:bg-primary/20 cursor-pointer">
+                                                    {style.icon} {style.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1 uppercase tracking-wider">
+                                        <Layers className="w-3 h-3" />
+                                        シーン数:
+                                    </span>
+                                    <Select value={String(sceneCount)} onValueChange={(v) => setSceneCount(Number(v))}>
+                                        <SelectTrigger className="w-[120px] h-8 text-xs glass border-primary/20">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="glass border-primary/20">
+                                            {SCENE_COUNTS.map((sc) => (
+                                                <SelectItem key={sc.value} value={String(sc.value)} className="text-xs focus:bg-primary/20 cursor-pointer">
+                                                    {sc.label}（{sc.desc}）
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
 
@@ -106,6 +134,7 @@ export function MVGeneratorModal({ prompt, open, onOpenChange }: Props) {
                             styleTags={prompt.styleTags}
                             coverUrl={prompt.coverUrl}
                             artStyle={artStyle}
+                            sceneCount={sceneCount}
                         />
                     </TabsContent>
                 </Tabs>
