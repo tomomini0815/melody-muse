@@ -308,19 +308,44 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 
   onProgress?.(20);
 
-  // 2. Generate image URLs for each scene using Pollinations.ai
+  // 2. Generate image URLs with fallback strategy
+  //    Primary: Pollinations.ai (AI-generated from prompt)
+  //    Fallback: picsum.photos (curated photography, mood-matched)
   const imageUrls: string[] = [];
+  let pollinationsAvailable = true;
+
+  // Quick availability check for Pollinations.ai
+  try {
+    const testResp = await fetch(
+      `https://image.pollinations.ai/prompt/${encodeURIComponent("test")}?width=64&height=64&nologo=true`,
+      { method: "HEAD", signal: AbortSignal.timeout(5000) }
+    );
+    if (!testResp.ok) pollinationsAvailable = false;
+  } catch {
+    pollinationsAvailable = false;
+  }
+
+  console.log(`[MV] Image provider: ${pollinationsAvailable ? "Pollinations.ai" : "picsum.photos (fallback)"}`);
+
   for (let i = 0; i < Math.min(sceneDescs.length, sceneCount); i++) {
     const cleanPrompt = sceneDescs[i]
       .replace(/^["'`\s]+|["'`\s]+$/g, "")
       .replace(/```[a-z]*\n?|```/g, "")
       .trim();
 
-    // Enhanced prompt with style boost and quality tags
-    const fullPrompt = `${styleBoost}, ${cleanPrompt}, masterpiece, best quality, ultra detailed, 8k resolution, no text, no watermark`;
-    const encodedPrompt = encodeURIComponent(fullPrompt);
-    const seed = Math.floor(Math.random() * 1000000);
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;
+    let url: string;
+    if (pollinationsAvailable) {
+      // Primary: Pollinations.ai with enhanced prompt
+      const fullPrompt = `${styleBoost}, ${cleanPrompt}, masterpiece, best quality, ultra detailed, 8k resolution, no text, no watermark`;
+      const encodedPrompt = encodeURIComponent(fullPrompt);
+      const seed = Math.floor(Math.random() * 1000000);
+      url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;
+    } else {
+      // Fallback: picsum.photos — random curated photography
+      // Use a unique seed per scene for variety
+      const picsumId = 100 + (i * 73 + Math.floor(Math.random() * 50)) % 900;
+      url = `https://picsum.photos/id/${picsumId}/1280/720`;
+    }
     imageUrls.push(url);
 
     onProgress?.(20 + (80 * (i + 1)) / sceneCount);
