@@ -98,12 +98,12 @@ export const THEMES = [
   { id: "future", label: "未来", labelEn: "Future" },
 ];
 
-export const LANGUAGES: { id: Language; label: string; icon: string }[] = [
-  { id: "ja", label: "日本語", icon: "🇯🇵" },
-  { id: "en", label: "English", icon: "🇺🇸" },
-  { id: "zh", label: "中国語", icon: "🇨🇳" },
-  { id: "id", label: "Indonesian", icon: "🇮🇩" },
-  { id: "vi", label: "Vietnamese", icon: "🇻🇳" },
+export const LANGUAGES: { id: Language; label: string; labelEn: string; icon: string }[] = [
+  { id: "ja", label: "日本語", labelEn: "Japanese", icon: "🇯🇵" },
+  { id: "en", label: "English", labelEn: "English", icon: "🇺🇸" },
+  { id: "zh", label: "中国語", labelEn: "Chinese", icon: "🇨🇳" },
+  { id: "id", label: "Indonesian", labelEn: "Indonesian", icon: "🇮🇩" },
+  { id: "vi", label: "Vietnamese", labelEn: "Vietnamese", icon: "🇻🇳" },
 ];
 
 export const ARTISTS: Artist[] = [

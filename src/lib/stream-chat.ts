@@ -1,4 +1,4 @@
-import { Language } from "./types";
+import { Language, LANGUAGES } from "./types";
 
 /**
  * Helper to fetch with exponential backoff for 429 errors
@@ -144,14 +144,8 @@ Generate the song now:`;
 }
 
 export async function translateLyrics(lyrics: string, targetLang: Language): Promise<string> {
-  const langNames: Record<Language, string> = {
-    "ja": "Japanese",
-    "en": "English",
-    "zh": "Chinese",
-    "id": "Indonesian",
-    "vi": "Vietnamese"
-  };
-  const targetName = langNames[targetLang];
+  const targetLangConfig = LANGUAGES.find(l => l.id === targetLang);
+  const targetName = targetLangConfig?.labelEn || "English";
 
   const prompt = `You are an expert translator. 
 TASK: Translate the lyrics below into ${targetName}.
