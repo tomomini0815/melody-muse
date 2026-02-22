@@ -3,15 +3,15 @@ import { Language, LANGUAGES } from "./types";
 /**
  * Helper to fetch with exponential backoff for 429 errors
  */
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 8): Promise<Response> {
   let retries = 0;
   while (true) {
     const resp = await fetch(url, options);
 
     if (resp.status === 429 && retries < maxRetries) {
-      // Starting with 8s backoff for standard rate limits.
-      const waitTime = Math.pow(2, retries) * 8000 + Math.random() * 2000;
-      console.warn(`Gemini API 429 detected. Retrying in ${Math.round(waitTime / 1000)}s... (Attempt ${retries + 1}/${maxRetries})`);
+      // More aggressive backoff for 2.5 Flash Lite quota limits.
+      const waitTime = Math.pow(2, retries) * 10000 + Math.random() * 3000;
+      console.warn(`Gemini API 429 detected. Waiting ${Math.round(waitTime / 1000)}s before next attempt... (Attempt ${retries + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       retries++;
       continue;
@@ -23,8 +23,10 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5)
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
-const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+// Security Note: Use x-goog-api-key header instead of query parameter to avoid leak in logs
+const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
+const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent`;
 
 export interface GenerateRequest {
   genres: string[];
@@ -112,7 +114,10 @@ Generate the song and analysis now:`;
 
   const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
@@ -385,7 +390,10 @@ Input Description: ${prompt}`;
 
   const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }]
     }),
@@ -420,7 +428,10 @@ REFINED LYRICS:`;
 
   const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
       generationConfig: {
@@ -476,7 +487,10 @@ Generate the OPTIMIZED song and new analysis now:`;
 
   const resp = await fetchWithRetry(GEMINI_POST_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: geminiPrompt }] }],
       generationConfig: {
