@@ -137,7 +137,8 @@ export default function Index() {
   }, [config]);
 
   const parseGeneratedText = (text: string, cfg: MusicConfig): Partial<GeneratedPrompt> => {
-    // Try to extract style tags, meta, and lyrics from AI output
+    // Try to extract style tags (consolidated or individual), meta, and lyrics from AI output
+    const combinedStyleMatch = text.match(/\[STYLE\s*&\s*META\]\s*([\s\S]*?)(?:\n\[|$)/i);
     const styleMatch = text.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i)
       || text.match(/Style\s*Tags?:\s*(.*?)(?:\n|$)/i);
     const bpmMatch = text.match(/BPM:\s*(\d+)/i);
@@ -172,13 +173,18 @@ export default function Index() {
     const genreLabels = cfg.genres.map((g) => GENRES.find((x) => x.id === g)?.labelEn || g);
     const moodLabel = MOODS.find((m) => m.id === cfg.mood)?.labelEn || cfg.mood;
 
+    const styleTags = styleMatch?.[1]?.trim() || `[${genreLabels.join(", ")}, ${moodLabel.toLowerCase()}]`;
+    const bpm = bpmMatch ? parseInt(bpmMatch[1]) : cfg.bpm;
+    const key = keyMatch?.[1]?.trim() || "C major";
+    const instruments = instrMatch?.[1]?.trim() || genreLabels.join(", ") + " instruments";
+
+    // Explicit combined prompt if specified by AI, otherwise build it
+    const fullStyle = combinedStyleMatch?.[1]?.trim() || `${styleTags}, ${bpm}BPM, ${key}, ${instruments}`;
+
     return {
-      styleTags: styleMatch?.[1]?.trim() || `[${genreLabels.join(", ")}, ${moodLabel.toLowerCase()}]`,
-      meta: {
-        bpm: bpmMatch ? parseInt(bpmMatch[1]) : cfg.bpm,
-        key: keyMatch?.[1]?.trim() || "C major",
-        instruments: instrMatch?.[1]?.trim() || genreLabels.join(", ") + " instruments",
-      },
+      styleTags,
+      fullStyle,
+      meta: { bpm, key, instruments },
       lyrics: lyricsMatch?.[1]?.trim() || text,
       viralAnalysis,
     };

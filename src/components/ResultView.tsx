@@ -51,7 +51,7 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   };
 
   const copyAll = () => {
-    const full = `Style Tags: ${prompt.styleTags} \n\nBPM: ${prompt.meta.bpm} | Key: ${prompt.meta.key} | Instruments: ${prompt.meta.instruments} \n\n${prompt.lyrics} `;
+    const full = `[Style & Meta]\n${prompt.fullStyle || prompt.styleTags}\n\n[Lyrics]\n${prompt.lyrics}`;
     copyText(full, "全体");
   };
 
@@ -89,16 +89,14 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
 
 
   const handleOpenSuno = async () => {
-    const styleWithMeta = `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
-    const full = `Style Tags: ${styleWithMeta} \n\n[Lyrics]\n${prompt.lyrics} `;
+    const full = prompt.fullStyle || `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
     await navigator.clipboard.writeText(full);
     toast({ title: "プロンプトをコピーしてSuno AIを開きます" });
     window.open("https://suno.com/create", "_blank");
   };
 
   const handleOpenMureka = async () => {
-    const styleWithMeta = `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
-    const full = `Style Tags: ${styleWithMeta} \n\n[Lyrics]\n${prompt.lyrics} `;
+    const full = prompt.fullStyle || `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
     await navigator.clipboard.writeText(full);
     toast({ title: "プロンプトをコピーしてMureka AIを開きます" });
     window.open("https://mureka.ai/create", "_blank");
@@ -356,13 +354,19 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
             </div>
           )}
 
-          {/* Style Tags */}
-          <div className="glass rounded-xl p-4">
+          {/* Style & Meta Consolidated */}
+          <div className="glass rounded-xl p-4 border-accent/20 bg-accent/5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-primary">Style Tags</h3>
-              <CopyBtn text={prompt.styleTags} label="スタイルタグ" />
+              <h3 className="text-sm font-semibold text-accent flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                Style & Meta (Suno/Mureka用)
+              </h3>
+              <CopyBtn text={prompt.fullStyle || prompt.styleTags} label="統合プロンプト" />
             </div>
-            <p className="font-mono text-sm text-accent leading-relaxed">{prompt.styleTags}</p>
+            <p className="font-mono text-sm text-foreground/90 leading-relaxed bg-background/40 p-3 rounded-lg border border-accent/10">
+              {prompt.fullStyle || prompt.styleTags}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-2">※外部サイトの Style/Prompt 欄にそのまま貼り付けてください</p>
           </div>
 
           {/* Meta */}

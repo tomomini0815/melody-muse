@@ -103,8 +103,8 @@ Target Language: ${targetLang}
 
 Output Format REQUIREMENT:
 Your response MUST strictly follow this structure:
-[Style Tags]
-(Comma separated tags like: J-Pop, Energetic, Piano, 170BPM)
+[Style & Meta]
+(Consolidated tags for copy-pasting. Format: Style Tags, BPM, Key, Instruments. e.g., J-Pop, Energetic, Piano, 170BPM, C Major, Drums)
 
 [Meta]
 BPM: ${config.bpm}

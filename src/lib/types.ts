@@ -56,6 +56,7 @@ export interface GeneratedPrompt {
   config: MusicConfig;
   createdAt: number;
   isFavorite: boolean;
+  fullStyle?: string;
   coverUrl?: string;
   originalPrompt?: string;
   viralAnalysis?: ViralAnalysis;
