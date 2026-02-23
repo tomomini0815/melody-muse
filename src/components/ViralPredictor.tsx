@@ -112,6 +112,9 @@ export function ViralPredictor({ analysis, onOptimize, isOptimizing }: Props) {
                     ))}
                 </div>
             </div>
+            <p className="text-[10px] text-muted-foreground italic mt-4 opacity-70">
+                *Based on Suno, Udio, and Mureka success patterns.
+            </p>
         </div>
     );
 }

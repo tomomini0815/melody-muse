@@ -112,10 +112,10 @@ Key: (e.g., C Major)
 Instruments: (e.g., Piano, Electric Guitar, Drums)
 
 [Viral Analysis]
-Score: (0-100 based on Suno/Udio success patterns)
+Score: (0-100 based on Suno/Udio/Mureka success patterns)
 Breakdown: Melody:XX, Empathy:XX, Trend:XX
-Market: (Current trend analysis, e.g., J-Pop is trending +15% this week)
-Suggestions: (3 specific bullet points to improve the score)
+Market: (Current trend analysis, e.g., J-Pop is trending +15% this week on Mureka/Suno)
+Suggestions: (3 specific bullet points to improve the score, optimized for Suno/Mureka platforms)
 
 [Lyrics]
 (The actual song lyrics in ${targetLang}. Use high-impact words and emotional structures found in viral hits.)
@@ -449,7 +449,8 @@ INPUT DATA:
 - Target Language: ${language}
 
 STRATEGY:
-- Incorporate "Success Patterns": Use high-retention structures (hook in first 5s), rhythmic repetition, and emotionally resonant "meme-able" phrases.
+- Incorporate "Success Patterns": Use high-retention structures (hook in first 5s), rhythmic repetition, and emotionally resonant "meme-able" phrases found in Suno/Udio/Mureka hits.
+- Mureka-Specific Optimization: Enhance production quality descriptors in style tags (e.g., "high-fidelity", "studio mixing", "professional master") to leverage Mureka's high-end sonic engine.
 - Trend Alignment: Adjust style tags to align with the current +15% J-Pop/Cinematic trend mentioned in the analysis.
 - Specific Fixes: Address EVERY suggestion provided in the current analysis.
 
