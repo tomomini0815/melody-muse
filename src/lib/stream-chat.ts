@@ -115,7 +115,7 @@ Instruments: (e.g., Piano, Electric Guitar, Drums)
 Score: (0-100 based on Suno/Udio/Mureka success patterns)
 Breakdown: Melody:XX, Empathy:XX, Trend:XX
 Market: (Current trend analysis, e.g., J-Pop is trending +15% this week on Mureka/Suno)
-Suggestions: (3 specific bullet points to improve the score, optimized for Suno/Mureka platforms)
+Suggestions: (3 specific bullet points to improve the score, aligned with the genre. Focus on practical improvements like "Add a catchy hook" or "Enhance vocal texture". AVOID niche styles like "Operatic" unless appropriate.)
 
 [Lyrics]
 (The actual song lyrics in ${targetLang}. Use high-impact words and emotional structures found in viral hits.)
@@ -503,9 +503,9 @@ Output your analysis in EXPLICIT JSON format with the following keys:
 - score: (number, 0-100)
 - breakdown: { melody: number, empathy: number, trend: number } (each 0-100)
 - marketTrend: (string, a short catchy trend comment like "J-Pop synth-rock is rising +20% this week")
-- suggestions: (array of 3 specific improvement suggestions in Japanese)
+- suggestions: (array of 3 specific improvement suggestions in Japanese. Focus on practical improvements like "Add a catchy synth hook", "Increase emotional resonance in the chorus", or "Layer professional vocal textures". AVOID suggesting niche styles like "Operatic" unless the genre is Classical or Metal.)
 
-IMPORTANT: The response MUST be ONLY the JSON object. Do not include markdown code blocks.`;
+IMPORTANT: The suggestions must align WITH THE CURRENT GENRE. Do not suggest extreme style shifts. The response MUST be ONLY the JSON object. Do not include markdown code blocks.`;
 
   const { postUrl } = getGeminiConfig();
   const resp = await fetchWithRetry(postUrl, {
