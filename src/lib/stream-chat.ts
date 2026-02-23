@@ -512,7 +512,7 @@ IMPORTANT: The response MUST be ONLY the JSON object. Do not include markdown co
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
-        response_mime_type: "application/json",
+        temperature: 0.7,
       }
     }),
   });
@@ -522,12 +522,16 @@ IMPORTANT: The response MUST be ONLY the JSON object. Do not include markdown co
   }
 
   const data = await resp.json();
-  const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  let rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  // Clean potential markdown code blocks
+  rawJson = rawJson.replace(/```json\n?|```/g, "").trim();
+
   try {
     return JSON.parse(rawJson);
   } catch (e) {
     console.error("Failed to parse viral analysis JSON:", rawJson);
-    throw new Error("分析結果の解析に失敗しました。");
+    throw new Error("分析結果の解析に失敗しました。AIの回答形式が正しくありません。");
   }
 }
 
