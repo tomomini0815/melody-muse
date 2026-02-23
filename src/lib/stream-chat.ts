@@ -262,13 +262,13 @@ Output ONLY the descriptive prompt in English. No other text.`;
  * アートスタイル別のプロンプト補強マッピング
  */
 const ART_STYLE_PROMPTS: Record<string, string> = {
-  "cinematic": "cinematic film still, 35mm anamorphic lens, shallow depth of field, dramatic volumetric lighting, filmic color grading, lens flare",
-  "anime": "anime art style, Studio Ghibli inspired, vibrant cel shading, detailed anime background, soft ambient lighting, beautiful anime scenery",
-  "cyberpunk": "cyberpunk aesthetic, neon-lit cityscape, holographic displays, rain-slicked streets, cyan and magenta lighting, blade runner style",
-  "3d-render": "high quality 3D render, octane render, unreal engine 5, volumetric fog, ray-traced global illumination, photorealistic materials, subsurface scattering",
-  "oil-painting": "masterful oil painting style, visible brushstrokes, rich impasto texture, classical composition, chiaroscuro lighting, museum quality fine art",
-  "pixel-art": "detailed pixel art, 16-bit retro game aesthetic, dithering architecture, limited color palette, nostalgic video game scene, crisp pixels",
-  "vaporwave": "vaporwave aesthetic, pastel pink and cyan gradient, retro 80s, marble statues, palm trees, grid landscape, VHS glitch effect, sunset hues",
+  "cinematic": "masterpiece, ultra-realistic cinematic film still, 35mm anamorphic lens, highly detailed human features, expressive characters, breathtaking natural scenery, dramatic volumetric lighting, 8k resolution, photorealistic textures",
+  "anime": "premium anime art style, detailed character design, Studio Ghibli inspired landscapes, vibrant cel shading, expressive anime eyes, atmospheric lighting, high-quality anime background, Makoto Shinkai aesthetic",
+  "cyberpunk": "cyberpunk aesthetic, high-tech low-life, neon-drenched streets, realistic human cyborgs, bustling futuristic cityscape, rain-slicked surfaces, volumetric fog, teal and orange color grading",
+  "3d-render": "hyper-realistic 3D render, Unreal Engine 5 style, complex cinematic character lighting, detailed environments, Ray Traced shadows, Octane Render, Subsurface Scattering on skin",
+  "oil-painting": "fine art oil painting, realistic figure painting, detailed portrait, visible impasto brushstrokes, classical museum quality, dramatic chiaroscuro, rich textures and landscapes",
+  "pixel-art": "high-fidelity pixel art, 32-bit aesthetic, detailed retro environments, expressive character sprites, atmospheric lighting, nostalgic but crisp",
+  "vaporwave": "retro-futuristic vaporwave, 80s aesthetic, realistic statues with neon lights, lo-fi aesthetic, tropical landscapes, pink and turquoise sunset, VHS dreamscape",
 };
 
 /**
@@ -299,16 +299,18 @@ ${lyrics.substring(0, 2000)}
 """
 
 INSTRUCTIONS:
-- Each scene description should be 40-60 words, highly detailed and vivid.
-- Describe the VISUAL COMPOSITION precisely: camera angle (close-up, wide shot, aerial, dutch angle), lighting (golden hour, neon, moonlight, backlit silhouette), color palette, atmosphere, and key visual elements.
-- Match emotional intensity to the lyrics: Verses should feel intimate and atmospheric, Choruses should feel epic and expansive, Bridges should feel transformative.
-- Create visual CONTINUITY between scenes — they should feel like one cohesive story.
-- Do NOT include any text, letters, words, or typography in ANY scene.
-- Each scene must be unique — no repeated compositions.
+- Each scene description should be 50-70 words, describing a COMPACT STORY.
+- MANDATORY: Include at least one central human character (protagonist) in multiple scenes to ensure emotional connection. Describe their face, expression, and attire vividly.
+- MANDATORY: Describe a SPECIFIC and VAST location for each scene (e.g., a cliffside at sunset, a bustling rainy city, a quiet moonlit bedroom).
+- Describe the VISUAL COMPOSITION precisely: camera angle (cinematic close-up, wide-angle landscape, aerial drone shot), lighting (golden hour, neon glow, dramatic shadows), and atmosphere.
+- Match emotional intensity to the lyrics: Verses should feel intimate and atmospheric, Choruses should feel epic and expansive.
+- Create visual CONTINUITY between scenes — the protagonist and setting should feel consistent throughout.
+- Do NOT include any text, letters, words, or typography.
+- Each scene must be a unique, high-impact cinematic frame.
 
 Output format — each scene on its own line, numbered 1-${sceneCount}:
-1. [detailed visual description]
-2. [detailed visual description]
+1. [detailed visual description including characters and environment]
+2. [detailed visual description including characters and environment]
 ...`;
 
   onProgress?.(5);
@@ -355,7 +357,7 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
       .trim();
 
     // Enhanced prompt with style boost and quality tags
-    const fullPrompt = `${styleBoost}, ${cleanPrompt}, masterpiece, best quality, ultra detailed, 8k resolution, no text, no watermark`;
+    const fullPrompt = `${styleBoost}, ${cleanPrompt}, highly detailed, cinematic lighting, 8k resolution, masterpiece, no text, no watermark, trending on artstation`;
     const encodedPrompt = encodeURIComponent(fullPrompt);
     const seed = Math.floor(Math.random() * 1000000);
     const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;

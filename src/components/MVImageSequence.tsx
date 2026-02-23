@@ -190,44 +190,44 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
 
             switch (motion) {
                 case "zoomIn":
-                    scale = 1.02 + t * 0.12;
-                    panX = Math.sin(timeSec * 0.05) * 15;
-                    panY = Math.cos(timeSec * 0.04) * 10;
+                    scale = 1.05 + t * 0.18;
+                    panX = Math.sin(timeSec * 0.08) * 20;
+                    panY = Math.cos(timeSec * 0.06) * 15;
                     break;
                 case "zoomOut":
-                    scale = 1.14 - t * 0.10;
-                    panX = Math.cos(timeSec * 0.06) * 12;
-                    panY = Math.sin(timeSec * 0.05) * 8;
+                    scale = 1.25 - t * 0.15;
+                    panX = Math.cos(timeSec * 0.09) * 18;
+                    panY = Math.sin(timeSec * 0.07) * 12;
                     break;
                 case "panLeft":
-                    scale = 1.08;
-                    panX = 40 - t * 80;
-                    panY = Math.sin(timeSec * 0.03) * 6;
+                    scale = 1.15;
+                    panX = 60 - t * 120;
+                    panY = Math.sin(timeSec * 0.05) * 10;
                     break;
                 case "panRight":
-                    scale = 1.08;
-                    panX = -40 + t * 80;
-                    panY = Math.cos(timeSec * 0.03) * 6;
+                    scale = 1.15;
+                    panX = -60 + t * 120;
+                    panY = Math.cos(timeSec * 0.05) * 10;
                     break;
                 case "panUp":
-                    scale = 1.06;
-                    panX = Math.sin(timeSec * 0.04) * 8;
-                    panY = 25 - t * 50;
+                    scale = 1.12;
+                    panX = Math.sin(timeSec * 0.06) * 12;
+                    panY = 40 - t * 80;
                     break;
                 case "panDown":
-                    scale = 1.06;
-                    panX = Math.cos(timeSec * 0.04) * 8;
-                    panY = -25 + t * 50;
+                    scale = 1.12;
+                    panX = Math.cos(timeSec * 0.06) * 12;
+                    panY = -40 + t * 80;
                     break;
                 case "diagonalTL":
-                    scale = 1.04 + t * 0.08;
-                    panX = 30 - t * 60;
-                    panY = 20 - t * 40;
+                    scale = 1.08 + t * 0.12;
+                    panX = 50 - t * 100;
+                    panY = 30 - t * 60;
                     break;
                 case "diagonalBR":
-                    scale = 1.04 + t * 0.08;
-                    panX = -30 + t * 60;
-                    panY = -20 + t * 40;
+                    scale = 1.08 + t * 0.12;
+                    panX = -50 + t * 100;
+                    panY = -30 + t * 60;
                     break;
             }
 
