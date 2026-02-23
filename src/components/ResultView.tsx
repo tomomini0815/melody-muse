@@ -102,6 +102,13 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     window.open("https://mureka.ai/create", "_blank");
   };
 
+  const handleOpenUdio = async () => {
+    const full = prompt.fullStyle || `${prompt.styleTags}, ${prompt.meta.bpm}BPM, Key: ${prompt.meta.key}, ${prompt.meta.instruments}`;
+    await navigator.clipboard.writeText(full);
+    toast({ title: "プロンプトをコピーしてUdioを開きます" });
+    window.open("https://udio.com/create", "_blank");
+  };
+
   const [isImageLoading, setIsImageLoading] = useState(false);
 
   const handleGenerateCover = async () => {
@@ -259,6 +266,10 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
             <Button size="sm" onClick={handleOpenSuno} className="marble-suno text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />
               <span>Sunoで作る</span>
+            </Button>
+            <Button size="sm" onClick={handleOpenUdio} className="marble-udio text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
+              <ExternalLink className="w-3.5 h-3.5 mr-1" />
+              <span>Udioで作る</span>
             </Button>
           </div>
         </div>
