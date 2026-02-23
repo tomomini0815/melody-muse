@@ -14,7 +14,7 @@ import { LoadingOverlay } from "@/components/LoadingOverlay";
 import {
   MusicConfig, GeneratedPrompt, DEFAULT_CONFIG, GENRES, MOODS, THEMES, ARTISTS, GenerationStatus
 } from "@/lib/types";
-import { generateLyrics } from "@/lib/stream-chat";
+import { generateLyrics, analyzeViralPotential } from "@/lib/stream-chat";
 import { saveToHistory, toggleFavorite, migrateToTurso } from "@/lib/storage";
 
 export default function Index() {
@@ -116,6 +116,16 @@ export default function Index() {
       setResult((prev) => prev ? { ...prev, ...parsed } : prev);
 
       setGenStatus("finalizing");
+
+      // Auto-analyze viral potential after generation
+      try {
+        const analysis = await analyzeViralPotential(parsed.lyrics || fullText, parsed.styleTags || "");
+        parsed.viralAnalysis = analysis;
+        setResult((prev) => prev ? { ...prev, viralAnalysis: analysis } : prev);
+      } catch (err) {
+        console.error("Auto viral analysis failed:", err);
+      }
+
       await saveToHistory({ ...newPrompt, ...parsed });
     } catch (e) {
       toast({ title: "エラー", description: (e as Error).message, variant: "destructive" });
@@ -136,6 +146,29 @@ export default function Index() {
     const lyricsMatch = text.match(/\[LYRICS?\]\s*([\s\S]*)/i)
       || text.match(/歌詞[：:]\s*([\s\S]*)/i);
 
+    // Parse Viral Analysis section
+    const viralMatch = text.match(/\[VIRAL(?:\s*ANALYSIS)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+    let viralAnalysis = undefined;
+
+    if (viralMatch) {
+      const vText = viralMatch[1];
+      const scoreM = vText.match(/Score:\s*(\d+)/i);
+      const breakdownM = vText.match(/Breakdown:\s*Melody:(\d+),\s*Empathy:(\d+),\s*Trend:(\d+)/i);
+      const marketM = vText.match(/Market:\s*(.*?)(?:\n|$)/i);
+      const suggM = vText.match(/Suggestions:\s*([\s\S]*?)(?:\n\w+:|$)/i);
+
+      viralAnalysis = {
+        score: scoreM ? parseInt(scoreM[1]) : 0,
+        breakdown: {
+          melody: breakdownM ? parseInt(breakdownM[1]) : 0,
+          empathy: breakdownM ? parseInt(breakdownM[2]) : 0,
+          trend: breakdownM ? parseInt(breakdownM[3]) : 0,
+        },
+        marketTrend: marketM?.[1]?.trim() || "Analyzing market trends...",
+        suggestions: suggM?.[1]?.trim().split("\n").map(s => s.replace(/^[-\s*•]+/, "").trim()).filter(Boolean) || [],
+      };
+    }
+
     const genreLabels = cfg.genres.map((g) => GENRES.find((x) => x.id === g)?.labelEn || g);
     const moodLabel = MOODS.find((m) => m.id === cfg.mood)?.labelEn || cfg.mood;
 
@@ -147,6 +180,7 @@ export default function Index() {
         instruments: instrMatch?.[1]?.trim() || genreLabels.join(", ") + " instruments",
       },
       lyrics: lyricsMatch?.[1]?.trim() || text,
+      viralAnalysis,
     };
   };
 

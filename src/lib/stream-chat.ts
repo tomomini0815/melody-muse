@@ -1,4 +1,4 @@
-import { Language, LANGUAGES } from "./types";
+import { Language, LANGUAGES, ViralAnalysis, GeneratedPrompt } from "./types";
 
 /**
  * Helper to fetch with exponential backoff for 429 errors
@@ -9,8 +9,12 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5)
     const resp = await fetch(url, options);
 
     if (resp.status === 429 && retries < maxRetries) {
-      // Starting with 5s backoff for standard rate limits.
-      const waitTime = Math.pow(2, retries) * 5000 + Math.random() * 1000;
+      // Starting with standard backoff, but allowing override for tests if needed (via world state or similar)
+      // For now, let's keep it simple and just reduce the base if it's a test environment
+      const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+      const baseWait = isTest ? 10 : 5000;
+      const waitTime = Math.pow(2, retries) * baseWait + Math.random() * (isTest ? 5 : 1000);
+
       console.warn(`Gemini API 429 detected. Retrying in ${Math.round(waitTime / 1000)}s... (Attempt ${retries + 1}/${maxRetries})`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       retries++;
@@ -21,10 +25,34 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5)
   }
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
-const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
-const GEMINI_POST_URL = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+function getGeminiConfig() {
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  const model = "gemini-2.5-flash-lite";
+  return {
+    key,
+    model,
+    streamUrl: `https://generativelanguage.googleapis.com/v1/models/${model}:streamGenerateContent?key=${key}&alt=sse`,
+    postUrl: `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key}`
+  };
+}
+
+/**
+ * Handle Gemini API errors and throw user-friendly messages
+ */
+async function handleApiError(resp: Response, context: string): Promise<never> {
+  const errorBody = await resp.text();
+  console.error(`Gemini API Error (${context}):`, resp.status, errorBody);
+
+  if (resp.status === 429) {
+    throw new Error("APIの利用制限（レートリミット）に達しました。1分間にリクエストが集中しすぎたか、1日の上限を超えた可能性があります。少し時間を置いてから再度お試しください。");
+  }
+
+  if (resp.status === 403 || resp.status === 401) {
+    throw new Error("APIキーが無効、または権限がありません。設定を確認してください。");
+  }
+
+  throw new Error(`${context}に失敗しました (${resp.status})。しばらくしてから再度お試しください。`);
+}
 
 export interface GenerateRequest {
   genres: string[];
@@ -83,29 +111,34 @@ BPM: ${config.bpm}
 Key: (e.g., C Major)
 Instruments: (e.g., Piano, Electric Guitar, Drums)
 
+[Viral Analysis]
+Score: (0-100 based on Suno/Udio success patterns)
+Breakdown: Melody:XX, Empathy:XX, Trend:XX
+Market: (Current trend analysis, e.g., J-Pop is trending +15% this week)
+Suggestions: (3 specific bullet points to improve the score)
+
 [Lyrics]
-(The actual song lyrics in ${targetLang})
+(The actual song lyrics in ${targetLang}. Use high-impact words and emotional structures found in viral hits.)
 
-Generate the song now:`;
+Generate the song and analysis now:`;
 
-  const resp = await fetchWithRetry(GEMINI_STREAM_URL, {
+  const { key, streamUrl } = getGeminiConfig();
+  if (!key) throw new Error("APIキーが設定されていません。.envファイルを確認してください。");
+
+  const resp = await fetchWithRetry(streamUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
         maxOutputTokens: 4096,
       }
     }),
   });
 
   if (!resp.ok || !resp.body) {
-    const errorBody = await resp.text();
-    console.error("Gemini API Error (Generate):", resp.status, errorBody);
-    throw new Error(`AIの生成に失敗しました (${resp.status}): APIキーやモデル設定を確認してください。`);
+    await handleApiError(resp, "歌詞の生成");
   }
 
   const reader = resp.body.getReader();
@@ -164,7 +197,8 @@ ${lyrics}
 TARGET LANGUAGE: ${targetName}
 TRANSLATED LYRICS:`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -176,9 +210,7 @@ TRANSLATED LYRICS:`;
   });
 
   if (!resp.ok) {
-    const errorBody = await resp.text();
-    console.error("Gemini API Error (Translate):", resp.status, errorBody);
-    throw new Error(`翻訳に失敗しました: ${resp.status}`);
+    await handleApiError(resp, "翻訳");
   }
   const data = await resp.json();
   const translation = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -197,7 +229,8 @@ Style Tags: ${styleTags}
 
 Output ONLY the descriptive prompt in English. No other text.`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -205,7 +238,9 @@ Output ONLY the descriptive prompt in English. No other text.`;
     }),
   });
 
-  if (!resp.ok) throw new Error("画像プロンプトの生成に失敗しました。");
+  if (!resp.ok) {
+    await handleApiError(resp, "画像プロンプトの生成");
+  }
   const data = await resp.json();
   const visualPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!visualPrompt) throw new Error("画像プロンプトが空です。");
@@ -232,7 +267,7 @@ const ART_STYLE_PROMPTS: Record<string, string> = {
   "cyberpunk": "cyberpunk aesthetic, neon-lit cityscape, holographic displays, rain-slicked streets, cyan and magenta lighting, blade runner style",
   "3d-render": "high quality 3D render, octane render, unreal engine 5, volumetric fog, ray-traced global illumination, photorealistic materials, subsurface scattering",
   "oil-painting": "masterful oil painting style, visible brushstrokes, rich impasto texture, classical composition, chiaroscuro lighting, museum quality fine art",
-  "pixel-art": "detailed pixel art, 16-bit retro game aesthetic, dithering effects, limited color palette, nostalgic video game scene, crisp pixels",
+  "pixel-art": "detailed pixel art, 16-bit retro game aesthetic, dithering architecture, limited color palette, nostalgic video game scene, crisp pixels",
   "vaporwave": "vaporwave aesthetic, pastel pink and cyan gradient, retro 80s, marble statues, palm trees, grid landscape, VHS glitch effect, sunset hues",
 };
 
@@ -278,7 +313,8 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 
   onProgress?.(5);
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -287,7 +323,9 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
     }),
   });
 
-  if (!resp.ok) throw new Error("シーン記述の生成に失敗しました。");
+  if (!resp.ok) {
+    await handleApiError(resp, "シーン記述の生成");
+  }
   const data = await resp.json();
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
@@ -336,7 +374,8 @@ Output only the tags separated by commas. Do not include brackets or extra text.
 
 Input Description: ${prompt}`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -344,7 +383,9 @@ Input Description: ${prompt}`;
     }),
   });
 
-  if (!resp.ok) throw new Error("プロンプト精査に失敗しました。");
+  if (!resp.ok) {
+    await handleApiError(resp, "プロンプト精査");
+  }
   const data = await resp.json();
   const refined = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!refined) throw new Error("精査結果が空です。");
@@ -371,7 +412,8 @@ CONSTRAINTS:
 
 REFINED LYRICS:`;
 
-  const resp = await fetchWithRetry(GEMINI_POST_URL, {
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -383,12 +425,180 @@ REFINED LYRICS:`;
   });
 
   if (!resp.ok) {
-    const errorBody = await resp.text();
-    console.error("Gemini API Error (Refine):", resp.status, errorBody);
-    throw new Error(`ブラッシュアップに失敗しました: ${resp.status}`);
+    await handleApiError(resp, "ブラッシュアップ");
   }
   const data = await resp.json();
   const refined = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!refined) throw new Error("ブラッシュアップ結果が空です。");
   return refined;
+}
+
+export async function optimizeLyricsForVirality(
+  lyrics: string,
+  currentAnalysis: any,
+  styleTags: string,
+  language: string
+): Promise<string> {
+  const geminiPrompt = `You are a strategic music marketing expert and professional songwriter.
+TASK: Optimize the provided lyrics and style tags to MAXIMIZE viral potential on Suno/Udio/TikTok.
+
+INPUT DATA:
+- Current Lyrics: ${lyrics}
+- Current Analysis: ${JSON.stringify(currentAnalysis)}
+- Style Tags: ${styleTags}
+- Target Language: ${language}
+
+STRATEGY:
+- Incorporate "Success Patterns": Use high-retention structures (hook in first 5s), rhythmic repetition, and emotionally resonant "meme-able" phrases.
+- Trend Alignment: Adjust style tags to align with the current +15% J-Pop/Cinematic trend mentioned in the analysis.
+- Specific Fixes: Address EVERY suggestion provided in the current analysis.
+
+OUTPUT FORMAT (Strictly follow):
+[Style Tags]
+(Updated tags)
+
+[Viral Analysis]
+(Updated metrics showing improvement)
+
+[Lyrics]
+(Fully optimized lyrics)
+
+Generate the OPTIMIZED song and new analysis now:`;
+
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: geminiPrompt }] }],
+      generationConfig: { temperature: 0.85 }
+    }),
+  });
+
+  if (!resp.ok) throw new Error("最適化に失敗しました。");
+  const data = await resp.json();
+  const optimized = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!optimized) throw new Error("最適化結果が空です。");
+  return optimized;
+}
+
+/**
+ * 歌詞とスタイルタグからバズりポテンシャルを分析する
+ */
+export async function analyzeViralPotential(lyrics: string, styleTags: string): Promise<ViralAnalysis> {
+  const prompt = `You are a viral trend analyst in the music industry.
+Analyze the viral potential of the following song based on its lyrics and style tags.
+
+Lyrics:
+"""
+${lyrics.substring(0, 1000)}
+"""
+
+Style Tags: ${styleTags}
+
+Output your analysis in EXPLICIT JSON format with the following keys:
+- score: (number, 0-100)
+- breakdown: { melody: number, empathy: number, trend: number } (each 0-100)
+- marketTrend: (string, a short catchy trend comment like "J-Pop synth-rock is rising +20% this week")
+- suggestions: (array of 3 specific improvement suggestions in Japanese)
+
+IMPORTANT: The response MUST be ONLY the JSON object. Do not include markdown code blocks.`;
+
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        response_mime_type: "application/json",
+      }
+    }),
+  });
+
+  if (!resp.ok) {
+    await handleApiError(resp, "バズり予測分析");
+  }
+
+  const data = await resp.json();
+  const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  try {
+    return JSON.parse(rawJson);
+  } catch (e) {
+    console.error("Failed to parse viral analysis JSON:", rawJson);
+    throw new Error("分析結果の解析に失敗しました。");
+  }
+}
+
+/**
+ * トレンドに合わせて楽曲全体を最適化する
+ */
+export async function optimizeForTrends(current: GeneratedPrompt): Promise<GeneratedPrompt> {
+  const prompt = `You are a world-class music producer aiming for a viral hit.
+Based on the current song structure, optimize it to be MORE TRENDY and CATCHY.
+
+Current Data:
+Style Tags: ${current.styleTags}
+BPM: ${current.meta.bpm} | Key: ${current.meta.key} | Instruments: ${current.meta.instruments}
+Lyrics:
+"""
+${current.lyrics}
+"""
+
+TASK:
+Improve the lyrics to be more emotional/relatable, refine style tags to include current popular sub-genres, and adjust meta info if needed.
+
+Output format REQUIREMENT:
+Your response MUST strictly follow this structure:
+[Style Tags]
+(Comma separated tags)
+
+[Meta]
+BPM: (number)
+Key: (string)
+Instruments: (string)
+
+[Lyrics]
+(Updated lyrics)
+
+Optimize for maximum viral potential now:`;
+
+  const { postUrl } = getGeminiConfig();
+  const resp = await fetchWithRetry(postUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 4096,
+      }
+    }),
+  });
+
+  if (!resp.ok) {
+    await handleApiError(resp, "トレンド最適化");
+  }
+
+  const data = await resp.json();
+  const fullText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  // Parse result (reuse logic from Index.tsx if possible, but let's implement local parser for robustness)
+  const styleMatch = fullText.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i)
+    || fullText.match(/Style\s*Tags?:\s*(.*?)(?:\n|$)/i);
+  const bpmMatch = fullText.match(/BPM:\s*(\d+)/i);
+  const keyMatch = fullText.match(/Key:\s*([A-Ga-g][#b]?\s*(?:major|minor|maj|min)?)/i);
+  const instrMatch = fullText.match(/Instruments?:\s*(.*?)(?:\n|$)/i);
+  const lyricsMatch = fullText.match(/\[LYRICS?\]\s*([\s\S]*)/i);
+
+  return {
+    ...current,
+    styleTags: styleMatch?.[1]?.trim() || current.styleTags,
+    meta: {
+      bpm: bpmMatch ? parseInt(bpmMatch[1]) : current.meta.bpm,
+      key: keyMatch?.[1]?.trim() || current.meta.key,
+      instruments: instrMatch?.[1]?.trim() || current.meta.instruments,
+    },
+    lyrics: lyricsMatch?.[1]?.trim() || fullText,
+  };
 }

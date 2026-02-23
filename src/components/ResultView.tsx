@@ -8,6 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import { translateLyrics, generateCoverArt, refineStyleTags } from "@/lib/stream-chat";
 import { Equalizer } from "./Equalizer";
 import { MVGeneratorModal } from "./MVGeneratorModal";
+import { ViralPredictor } from "./ViralPredictor";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { refineLyrics as refineLyricsApi } from "@/lib/stream-chat";
+import { refineLyrics as refineLyricsApi, analyzeViralPotential, optimizeLyricsForVirality } from "@/lib/stream-chat";
 
 interface Props {
   prompt: GeneratedPrompt;
@@ -39,6 +40,8 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   const [isRefining, setIsRefining] = useState(false);
   const [isMVOpen, setIsMVOpen] = useState(false);
   const [isRefinePopoverOpen, setIsRefinePopoverOpen] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [isAnalyzingViral, setIsAnalyzingViral] = useState(false);
 
   const copyText = async (text: string, label: string) => {
     await navigator.clipboard.writeText(text);
@@ -146,6 +149,70 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
     }
   };
 
+  const handleViralAnalysis = async () => {
+    setIsAnalyzingViral(true);
+    try {
+      const analysis = await analyzeViralPotential(prompt.lyrics, prompt.styleTags);
+      await onUpdatePrompt({ ...prompt, viralAnalysis: analysis });
+      toast({ title: "バズり予測を更新しました" });
+    } catch (e) {
+      toast({ title: "分析エラー", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsAnalyzingViral(false);
+    }
+  };
+
+  const handleOptimize = async () => {
+    setIsOptimizing(true);
+    try {
+      const optimizedText = await optimizeLyricsForVirality(
+        prompt.lyrics,
+        prompt.viralAnalysis,
+        prompt.styleTags,
+        prompt.config.language
+      );
+
+      // Parse the optimized output
+      const styleMatch = optimizedText.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+      const lyricsMatch = optimizedText.match(/\[LYRICS?\]\s*([\s\S]*)/i);
+      const viralMatch = optimizedText.match(/\[VIRAL(?:\s*ANALYSIS)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+
+      let viralAnalysis = prompt.viralAnalysis;
+      if (viralMatch) {
+        const vText = viralMatch[1];
+        const scoreM = vText.match(/Score:\s*(\d+)/i);
+        const breakdownM = vText.match(/Breakdown:\s*Melody:(\d+),\s*Empathy:(\d+),\s*Trend:(\d+)/i);
+        const marketM = vText.match(/Market:\s*(.*?)(?:\n|$)/i);
+        const suggM = vText.match(/Suggestions:\s*([\s\S]*?)(?:\n\w+:|$)/i);
+
+        viralAnalysis = {
+          score: scoreM ? parseInt(scoreM[1]) : (prompt.viralAnalysis?.score || 0),
+          breakdown: {
+            melody: breakdownM ? parseInt(breakdownM[1]) : (prompt.viralAnalysis?.breakdown.melody || 0),
+            empathy: breakdownM ? parseInt(breakdownM[2]) : (prompt.viralAnalysis?.breakdown.empathy || 0),
+            trend: breakdownM ? parseInt(breakdownM[3]) : (prompt.viralAnalysis?.breakdown.trend || 0),
+          },
+          marketTrend: marketM?.[1]?.trim() || (prompt.viralAnalysis?.marketTrend || ""),
+          suggestions: suggM?.[1]?.trim().split("\n").map(s => s.replace(/^[-\s*•]+/, "").trim()).filter(Boolean) || (prompt.viralAnalysis?.suggestions || []),
+        };
+      }
+
+      const updatedPrompt = {
+        ...prompt,
+        lyrics: lyricsMatch?.[1]?.trim() || prompt.lyrics,
+        styleTags: styleMatch?.[1]?.trim() || prompt.styleTags,
+        viralAnalysis
+      };
+
+      await onUpdatePrompt(updatedPrompt);
+      toast({ title: "バズり戦略に基づき最適化しました" });
+    } catch (e) {
+      toast({ title: "最適化エラー", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const CopyBtn = ({ text, label }: { text: string; label: string }) => (
     <Button variant="ghost" size="icon" onClick={() => copyText(text, label)} className="h-8 w-8">
       {copied === label ? <Check className="w-4 h-4 text-accent" /> : <Copy className="w-4 h-4" />}
@@ -197,6 +264,37 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="space-y-4">
+        {prompt.viralAnalysis ? (
+          <ViralPredictor
+            analysis={prompt.viralAnalysis}
+            onOptimize={handleOptimize}
+            isOptimizing={isOptimizing}
+          />
+        ) : (
+          <div className="glass rounded-xl p-5 border-primary/20 bg-secondary/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-primary">バズり予測</h3>
+                <p className="text-xs text-muted-foreground">AIがこの曲のバズりポテンシャルを分析します</p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleViralAnalysis}
+              disabled={isAnalyzingViral || isStreaming}
+              className="gradient-primary rounded-full px-6"
+            >
+              {isAnalyzingViral && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              分析を実行
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
