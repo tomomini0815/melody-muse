@@ -259,6 +259,10 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
           </div>
 
           <div className="flex items-center gap-2 justify-end mt-1">
+            <Button size="sm" onClick={handleOpenUdio} className="marble-udio text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
+              <ExternalLink className="w-3.5 h-3.5 mr-1" />
+              <span>Udioで作る</span>
+            </Button>
             <Button size="sm" onClick={handleOpenMureka} className="marble-mureka text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />
               <span>Murekaで作る</span>
@@ -266,10 +270,6 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
             <Button size="sm" onClick={handleOpenSuno} className="marble-suno text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
               <ExternalLink className="w-3.5 h-3.5 mr-1" />
               <span>Sunoで作る</span>
-            </Button>
-            <Button size="sm" onClick={handleOpenUdio} className="marble-udio text-[10px] sm:text-xs h-8 sm:h-9 shrink-0 px-2.5 sm:px-4 rounded-full shadow-lg border-none">
-              <ExternalLink className="w-3.5 h-3.5 mr-1" />
-              <span>Udioで作る</span>
             </Button>
           </div>
         </div>
