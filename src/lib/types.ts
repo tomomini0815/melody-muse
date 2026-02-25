@@ -31,6 +31,10 @@ export interface MusicConfig {
   language: Language;
   duration: Duration;
   artist?: string; // Artist ID
+  creatorCategory?: string;
+  creatorSubCategory?: string;
+  creatorScene?: string;
+  instrumental: boolean;
 }
 
 export interface ViralAnalysis {
@@ -374,4 +378,5 @@ export const DEFAULT_CONFIG: MusicConfig = {
   language: "ja",
   duration: "2min",
   artist: "",
+  instrumental: false,
 };

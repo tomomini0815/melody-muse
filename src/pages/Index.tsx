@@ -51,12 +51,14 @@ export default function Index() {
       customArtist: "",
       language: Math.random() > 0.5 ? "ja" : "en",
       duration: (["30s", "1min", "2min", "3min+"] as const)[Math.floor(Math.random() * 4)],
+      instrumental: false,
     });
     setStep(2);
     handleGenerate({
       genres: rGenres, mood: rMood, tempo: "custom", bpm,
       themes: rThemes, customTheme: "", customArtist: "", language: Math.random() > 0.5 ? "ja" : "en",
       duration: (["30s", "1min", "2min", "3min+"] as const)[Math.floor(Math.random() * 4)],
+      instrumental: false,
     });
   };
 
@@ -101,6 +103,7 @@ export default function Index() {
           language: c.language,
           duration: c.duration,
           artist: artistStyle,
+          instrumental: c.instrumental,
         },
         (delta) => {
           setGenStatus("crafting");
@@ -207,113 +210,117 @@ export default function Index() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 border-b border-border">
-        <div className="container max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => {
-              setStep(0);
-              setResult(null);
-              setConfig({ ...DEFAULT_CONFIG });
-            }}
-          >
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl gradient-primary flex items-center justify-center shrink-0">
-              <Music className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
+      <header className="relative z-10 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 w-full">
+        <div className="w-full px-4 sm:px-6">
+          <div className="max-w-4xl mx-auto py-3 flex items-center justify-between gap-2">
+            <div
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity shrink min-w-0"
+              onClick={() => {
+                setStep(0);
+                setResult(null);
+                setConfig({ ...DEFAULT_CONFIG });
+              }}
+            >
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl gradient-primary flex items-center justify-center shrink-0">
+                <Music className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg font-display font-bold gradient-text truncate">MusicAI Prompt Studio</h1>
+                <p className="text-[9px] sm:text-xs text-muted-foreground whitespace-nowrap">音楽プロンプトジェネレーター</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-sm sm:text-lg font-display font-bold gradient-text">MusicAI Prompt Studio</h1>
-              <p className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">音楽プロンプトジェネレーター</p>
-            </div>
-          </div>
-          <div className="flex gap-0 sm:gap-1 ml-auto shrink-0">
-            <Link to="/analysis">
-              <Button variant="ghost" size="sm" className="flex flex-col items-center h-auto py-1.5 px-2 hover:bg-primary/10 transition-colors group">
-                <AudioWaveform className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
-                <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">音楽分析</span>
+            <div className="flex gap-1 sm:gap-2 ml-auto shrink-0">
+              <Link to="/analysis">
+                <Button variant="ghost" size="sm" className="flex flex-col items-center h-auto py-1 px-2 hover:bg-primary/10 transition-colors group">
+                  <AudioWaveform className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
+                  <span className="text-[8px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">分析</span>
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating} className="flex flex-col items-center h-auto py-1 px-2 hover:bg-primary/10 transition-colors group">
+                <Shuffle className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
+                <span className="text-[8px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">お任せ</span>
               </Button>
-            </Link>
-            <Button variant="ghost" size="sm" onClick={randomize} disabled={isGenerating} className="flex flex-col items-center h-auto py-1.5 px-2 hover:bg-primary/10 transition-colors group">
-              <Shuffle className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
-              <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">ランダム作成</span>
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)} className="flex flex-col items-center h-auto py-1.5 px-2 hover:bg-primary/10 transition-colors group">
-              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
-              <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">履歴</span>
-            </Button>
+              <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)} className="flex flex-col items-center h-auto py-1 px-2 hover:bg-primary/10 transition-colors group">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:text-primary transition-colors" />
+                <span className="text-[8px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-foreground">履歴</span>
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main */}
-      <main className="relative z-10 container max-w-4xl mx-auto px-4 py-8">
-        <StepIndicator current={step} isGenreSelected={config.genres.length > 0} />
+      <main className="relative z-10 w-full px-4 sm:px-6 py-8">
+        <div className="max-w-4xl mx-auto">
+          <StepIndicator current={step} isGenreSelected={config.genres.length > 0} />
 
-        <AnimatePresence mode="wait">
-          {step === 0 && (
-            <motion.div key="s0" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <GenreSelector selected={config.genres} onChange={(genres) => setConfig((c) => ({ ...c, genres }))} />
-              <div className="mt-8 flex justify-end">
-                <Button onClick={() => {
-                  if (config.genres.length === 0) {
-                    toast({ title: "ジャンルを1つ以上選択してください", variant: "destructive" });
-                    return;
-                  }
-                  setStep(1);
-                }} className="gradient-primary">
-                  次へ <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </div>
-            </motion.div>
-          )}
+          <AnimatePresence mode="wait">
+            {step === 0 && (
+              <motion.div key="s0" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
+                <GenreSelector selected={config.genres} onChange={(genres) => setConfig((c) => ({ ...c, genres }))} />
+                <div className="mt-8 flex justify-end">
+                  <Button onClick={() => {
+                    if (config.genres.length === 0) {
+                      toast({ title: "ジャンルを1つ以上選択してください", variant: "destructive" });
+                      return;
+                    }
+                    setStep(1);
+                  }} className="gradient-primary">
+                    次へ <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
 
-          {step === 1 && (
-            <motion.div key="s1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <CustomizeForm config={config} onChange={setConfig} />
-              <div className="mt-4 flex justify-between">
-                <Button variant="outline" onClick={() => setStep(0)}>
-                  <ArrowLeft className="w-4 h-4 mr-1" /> 戻る
-                </Button>
-                <Button onClick={() => handleGenerate()} className="gradient-primary" disabled={isGenerating}>
-                  {isGenerating ? (
-                    <><Equalizer bars={3} className="mr-2" /> 生成中...</>
-                  ) : (
-                    <><Sparkles className="w-4 h-4 mr-1" /> 生成する</>
-                  )}
-                </Button>
-              </div>
-            </motion.div>
-          )}
+            {step === 1 && (
+              <motion.div key="s1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
+                <CustomizeForm config={config} onChange={setConfig} />
+                <div className="mt-4 flex justify-between">
+                  <Button variant="outline" onClick={() => setStep(0)}>
+                    <ArrowLeft className="w-4 h-4 mr-1" /> 戻る
+                  </Button>
+                  <Button onClick={() => handleGenerate()} className="gradient-primary" disabled={isGenerating}>
+                    {isGenerating ? (
+                      <><Equalizer bars={3} className="mr-2" /> 生成中...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4 mr-1" /> 生成する</>
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
 
-          {step === 2 && result && (
-            <motion.div key="s2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
-              <ResultView
-                prompt={result}
-                isStreaming={isStreaming}
-                onUpdateLyrics={async (lyrics) => {
-                  const updated = { ...result, lyrics };
-                  setResult(updated);
-                  await saveToHistory(updated);
-                }}
-                onToggleFavorite={async () => {
-                  const newFavStatus = await toggleFavorite(result.id);
-                  setResult((p) => p ? { ...p, isFavorite: newFavStatus } : p);
-                }}
-                onUpdatePrompt={async (updated) => {
-                  setResult(updated);
-                  await saveToHistory(updated);
-                }}
-              />
-              <div className="mt-4 flex justify-between">
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  <ArrowLeft className="w-4 h-4 mr-1" /> 設定に戻る
-                </Button>
-                <Button onClick={() => handleGenerate()} className="gradient-primary" disabled={isGenerating}>
-                  <Sparkles className="w-4 h-4 mr-1" /> 再生成
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {step === 2 && result && (
+              <motion.div key="s2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}>
+                <ResultView
+                  prompt={result}
+                  isStreaming={isStreaming}
+                  onUpdateLyrics={async (lyrics) => {
+                    const updated = { ...result, lyrics };
+                    setResult(updated);
+                    await saveToHistory(updated);
+                  }}
+                  onToggleFavorite={async () => {
+                    const newFavStatus = await toggleFavorite(result.id);
+                    setResult((p) => p ? { ...p, isFavorite: newFavStatus } : p);
+                  }}
+                  onUpdatePrompt={async (updated) => {
+                    setResult(updated);
+                    await saveToHistory(updated);
+                  }}
+                />
+                <div className="mt-4 flex justify-between">
+                  <Button variant="outline" onClick={() => setStep(1)}>
+                    <ArrowLeft className="w-4 h-4 mr-1" /> 設定に戻る
+                  </Button>
+                  <Button onClick={() => handleGenerate()} className="gradient-primary" disabled={isGenerating}>
+                    <Sparkles className="w-4 h-4 mr-1" /> 再生成
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </main>
 
       <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} onLoad={loadFromHistory} />

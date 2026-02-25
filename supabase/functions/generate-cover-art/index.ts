@@ -17,7 +17,7 @@ serve(async (req) => {
     }
 
     try {
-        const { lyrics, styleTags } = await req.json();
+        const { lyrics, styleTags, prompt } = await req.json();
         const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
         if (!LOVABLE_API_KEY) {
@@ -25,39 +25,45 @@ serve(async (req) => {
             throw new Error("APIキーが設定されていません");
         }
 
-        console.log("Generating visual prompt for lyrics and style...");
+        let visualPrompt = prompt;
 
-        // Generate a visual prompt based on lyrics and style
-        const promptResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "google/gemini-1.5-flash", // Changed to a valid model name
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are an expert art director. Create a detailed, artistic image generation prompt for a music cover based on the provided lyrics and style tags. Output ONLY the absolute core image prompt text. Keep it around 40-50 words, focusing on artistic style, mood, and key visual elements. Avoid meta-text or labels."
-                    },
-                    {
-                        role: "user",
-                        content: `Style: ${styleTags}\n\nLyrics Snapshot: ${lyrics.slice(0, 500)}`
-                    },
-                ],
-            }),
-        });
+        if (!visualPrompt) {
+            console.log("Generating visual prompt for lyrics and style...");
 
-        if (!promptResponse.ok) {
-            const errorText = await promptResponse.text();
-            console.error("Prompt generation failed:", promptResponse.status, errorText);
-            throw new Error(`プロンプト生成エラー (${promptResponse.status})`);
+            // Generate a visual prompt based on lyrics and style
+            const promptResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: "google/gemini-1.5-flash",
+                    messages: [
+                        {
+                            role: "system",
+                            content: "You are an expert art director. Create a detailed, artistic image generation prompt for a music cover based on the provided lyrics and style tags. Output ONLY the absolute core image prompt text. Keep it around 40-50 words, focusing on artistic style, mood, and key visual elements. Avoid meta-text or labels."
+                        },
+                        {
+                            role: "user",
+                            content: `Style: ${styleTags}\n\nLyrics Snapshot: ${lyrics?.slice(0, 500) || ""}`
+                        },
+                    ],
+                }),
+            });
+
+            if (!promptResponse.ok) {
+                const errorText = await promptResponse.text();
+                console.error("Prompt generation failed:", promptResponse.status, errorText);
+                throw new Error(`プロンプト生成エラー (${promptResponse.status})`);
+            }
+
+            const promptData = await promptResponse.json();
+            visualPrompt = promptData.choices[0].message.content.trim();
+            console.log("Visual Prompt generated:", visualPrompt);
+        } else {
+            console.log("Using provided visual prompt:", visualPrompt);
         }
-
-        const promptData = await promptResponse.json();
-        const visualPrompt = promptData.choices[0].message.content.trim();
-        console.log("Visual Prompt generated:", visualPrompt);
 
         console.log("Requesting image generation from DALL-E 3...");
 

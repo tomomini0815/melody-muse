@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
-  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User, Globe, Languages as LanguagesIcon, Search,
+  Sun, Moon, Zap, Feather, CloudRain, Sparkles, User, Globe, Languages as LanguagesIcon, Search, MicOff,
 } from "lucide-react";
 
 const moodIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -27,6 +27,8 @@ const durationOptions: { id: Duration; label: string }[] = [
   { id: "3min+", label: "3分以上" },
 ];
 
+import { CreatorWorkflow } from "./CreatorWorkflow";
+
 interface Props {
   config: MusicConfig;
   onChange: (config: MusicConfig) => void;
@@ -39,6 +41,9 @@ export function CustomizeForm({ config, onChange }: Props) {
 
   return (
     <div className="space-y-8">
+      {/* Creator Categories (Step-by-step) */}
+      <CreatorWorkflow config={config} onChange={onChange} />
+
       {/* Mood */}
       <div>
         <h3 className="text-lg font-display font-semibold mb-3">ムード</h3>
@@ -336,6 +341,36 @@ export function CustomizeForm({ config, onChange }: Props) {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Instrumental Toggle */}
+      <div className="flex items-center justify-between p-4 rounded-xl border border-accent/20 bg-accent/5">
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            "p-2 rounded-lg",
+            config.instrumental ? "bg-accent/20 text-accent" : "bg-muted text-muted-foreground"
+          )}>
+            <MicOff className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold">インストゥルメンタル (歌詞なし)</h3>
+            <p className="text-[10px] text-muted-foreground">歌声を含まない BGM 専用のプロンプトを生成します</p>
+          </div>
+        </div>
+        <button
+          onClick={() => update({ instrumental: !config.instrumental })}
+          className={cn(
+            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+            config.instrumental ? "bg-accent" : "bg-muted"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+              config.instrumental ? "translate-x-6" : "translate-x-1"
+            )}
+          />
+        </button>
       </div>
     </div>
   );

@@ -56,6 +56,10 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   };
 
   const handleTranslate = async (targetLang: Language) => {
+    if (prompt.lyrics.includes("[Instrumental")) {
+      toast({ title: "インストゥルメンタル曲は翻訳できません" });
+      return;
+    }
     setIsTranslating(true);
     try {
       const translation = await translateLyrics(prompt.lyrics, targetLang);
@@ -69,6 +73,10 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   };
 
   const handleRefineLyrics = async () => {
+    if (prompt.lyrics.includes("[Instrumental")) {
+      toast({ title: "インストゥルメンタル曲の歌詞は編集できません" });
+      return;
+    }
     if (!refinementFeedback.trim()) {
       toast({ title: "指示を入力してください", variant: "destructive" });
       return;
@@ -168,49 +176,89 @@ export function ResultView({ prompt, isStreaming, onUpdateLyrics, onToggleFavori
   };
 
   const handleOptimize = async () => {
+    const isInstrumental = prompt.lyrics.includes("[Instrumental");
     setIsOptimizing(true);
     try {
-      const optimizedText = await optimizeLyricsForVirality(
-        prompt.lyrics,
-        prompt.viralAnalysis,
-        prompt.styleTags,
-        prompt.config.language
-      );
+      if (isInstrumental) {
+        // Instrumental/BGM: Style Tags のみ最適化し、歌詞（アレンジ記述）はそのまま保持
+        const optimizedText = await optimizeLyricsForVirality(
+          "[Instrumental]",
+          prompt.viralAnalysis,
+          prompt.styleTags,
+          prompt.config.language
+        );
 
-      // Parse the optimized output
-      const styleMatch = optimizedText.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
-      const lyricsMatch = optimizedText.match(/\[LYRICS?\]\s*([\s\S]*)/i);
-      const viralMatch = optimizedText.match(/\[VIRAL(?:\s*ANALYSIS)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+        // Parse only style tags and viral analysis, keep lyrics unchanged
+        const styleMatch = optimizedText.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+        const viralMatch = optimizedText.match(/\[VIRAL(?:\s*ANALYSIS)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
 
-      let viralAnalysis = prompt.viralAnalysis;
-      if (viralMatch) {
-        const vText = viralMatch[1];
-        const scoreM = vText.match(/Score:\s*(\d+)/i);
-        const breakdownM = vText.match(/Breakdown:\s*Melody:(\d+),\s*Empathy:(\d+),\s*Trend:(\d+)/i);
-        const marketM = vText.match(/Market:\s*(.*?)(?:\n|$)/i);
-        const suggM = vText.match(/Suggestions:\s*([\s\S]*?)(?:\n\w+:|$)/i);
+        let viralAnalysis = prompt.viralAnalysis;
+        if (viralMatch) {
+          const vText = viralMatch[1];
+          const scoreM = vText.match(/Score:\s*(\d+)/i);
+          const breakdownM = vText.match(/Breakdown:\s*Melody:(\d+),\s*Empathy:(\d+),\s*Trend:(\d+)/i);
+          const marketM = vText.match(/Market:\s*(.*?)(?:\n|$)/i);
+          const suggM = vText.match(/Suggestions:\s*([\s\S]*?)(?:\n\w+:|$)/i);
+          viralAnalysis = {
+            score: scoreM ? parseInt(scoreM[1]) : (prompt.viralAnalysis?.score || 0),
+            breakdown: {
+              melody: breakdownM ? parseInt(breakdownM[1]) : (prompt.viralAnalysis?.breakdown.melody || 0),
+              empathy: breakdownM ? parseInt(breakdownM[2]) : (prompt.viralAnalysis?.breakdown.empathy || 0),
+              trend: breakdownM ? parseInt(breakdownM[3]) : (prompt.viralAnalysis?.breakdown.trend || 0),
+            },
+            marketTrend: marketM?.[1]?.trim() || (prompt.viralAnalysis?.marketTrend || ""),
+            suggestions: suggM?.[1]?.trim().split("\n").map(s => s.replace(/^[-\s*•]+/, "").trim()).filter(Boolean) || (prompt.viralAnalysis?.suggestions || []),
+          };
+        }
 
-        viralAnalysis = {
-          score: scoreM ? parseInt(scoreM[1]) : (prompt.viralAnalysis?.score || 0),
-          breakdown: {
-            melody: breakdownM ? parseInt(breakdownM[1]) : (prompt.viralAnalysis?.breakdown.melody || 0),
-            empathy: breakdownM ? parseInt(breakdownM[2]) : (prompt.viralAnalysis?.breakdown.empathy || 0),
-            trend: breakdownM ? parseInt(breakdownM[3]) : (prompt.viralAnalysis?.breakdown.trend || 0),
-          },
-          marketTrend: marketM?.[1]?.trim() || (prompt.viralAnalysis?.marketTrend || ""),
-          suggestions: suggM?.[1]?.trim().split("\n").map(s => s.replace(/^[-\s*•]+/, "").trim()).filter(Boolean) || (prompt.viralAnalysis?.suggestions || []),
-        };
+        // Only update style tags and analysis; KEEP lyrics untouched
+        await onUpdatePrompt({
+          ...prompt,
+          styleTags: styleMatch?.[1]?.trim() || prompt.styleTags,
+          viralAnalysis
+        });
+        toast({ title: "BGMのスタイルタグを最適化しました（歌詞は変更なし）" });
+      } else {
+        // Vocal song: full optimization
+        const optimizedText = await optimizeLyricsForVirality(
+          prompt.lyrics,
+          prompt.viralAnalysis,
+          prompt.styleTags,
+          prompt.config.language
+        );
+
+        const styleMatch = optimizedText.match(/\[STYLE(?:\s*TAGS?)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+        const lyricsMatch = optimizedText.match(/\[LYRICS?\]\s*([\s\S]*)/i);
+        const viralMatch = optimizedText.match(/\[VIRAL(?:\s*ANALYSIS)?\]\s*([\s\S]*?)(?:\n\[|$)/i);
+
+        let viralAnalysis = prompt.viralAnalysis;
+        if (viralMatch) {
+          const vText = viralMatch[1];
+          const scoreM = vText.match(/Score:\s*(\d+)/i);
+          const breakdownM = vText.match(/Breakdown:\s*Melody:(\d+),\s*Empathy:(\d+),\s*Trend:(\d+)/i);
+          const marketM = vText.match(/Market:\s*(.*?)(?:\n|$)/i);
+          const suggM = vText.match(/Suggestions:\s*([\s\S]*?)(?:\n\w+:|$)/i);
+
+          viralAnalysis = {
+            score: scoreM ? parseInt(scoreM[1]) : (prompt.viralAnalysis?.score || 0),
+            breakdown: {
+              melody: breakdownM ? parseInt(breakdownM[1]) : (prompt.viralAnalysis?.breakdown.melody || 0),
+              empathy: breakdownM ? parseInt(breakdownM[2]) : (prompt.viralAnalysis?.breakdown.empathy || 0),
+              trend: breakdownM ? parseInt(breakdownM[3]) : (prompt.viralAnalysis?.breakdown.trend || 0),
+            },
+            marketTrend: marketM?.[1]?.trim() || (prompt.viralAnalysis?.marketTrend || ""),
+            suggestions: suggM?.[1]?.trim().split("\n").map(s => s.replace(/^[-\s*•]+/, "").trim()).filter(Boolean) || (prompt.viralAnalysis?.suggestions || []),
+          };
+        }
+
+        await onUpdatePrompt({
+          ...prompt,
+          lyrics: lyricsMatch?.[1]?.trim() || prompt.lyrics,
+          styleTags: styleMatch?.[1]?.trim() || prompt.styleTags,
+          viralAnalysis
+        });
+        toast({ title: "バズり戦略に基づき最適化しました" });
       }
-
-      const updatedPrompt = {
-        ...prompt,
-        lyrics: lyricsMatch?.[1]?.trim() || prompt.lyrics,
-        styleTags: styleMatch?.[1]?.trim() || prompt.styleTags,
-        viralAnalysis
-      };
-
-      await onUpdatePrompt(updatedPrompt);
-      toast({ title: "バズり戦略に基づき最適化しました" });
     } catch (e) {
       toast({ title: "最適化エラー", description: (e as Error).message, variant: "destructive" });
     } finally {

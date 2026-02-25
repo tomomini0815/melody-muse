@@ -248,6 +248,10 @@ export function MVCanvasPreview({ lyrics, mood, bpm, coverUrl, styleTags }: Prop
                 ctx.shadowColor = theme.accentColor;
             }
 
+            if (currentSec.lines[0] === "[Instrumental]") {
+                ctx.restore();
+                return;
+            }
             ctx.fillText(currentSec.lines[i], w / 2, y + slideOffset);
             ctx.restore();
         }

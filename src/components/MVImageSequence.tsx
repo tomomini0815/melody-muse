@@ -98,6 +98,39 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
         grainCanvasRef.current = grain;
     }, []);
 
+    // Load a single image with timeout and retry
+    const loadImageWithRetry = async (url: string, maxRetries = 2, timeoutMs = 30000): Promise<HTMLImageElement | null> => {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                    const image = new Image();
+                    image.crossOrigin = "anonymous";
+                    const timer = setTimeout(() => {
+                        image.src = "";
+                        reject(new Error("timeout"));
+                    }, timeoutMs);
+                    image.onload = () => {
+                        clearTimeout(timer);
+                        resolve(image);
+                    };
+                    image.onerror = () => {
+                        clearTimeout(timer);
+                        reject(new Error("load error"));
+                    };
+                    // Add cache-busting on retry to force fresh request
+                    image.src = attempt > 0 ? `${url}&retry=${attempt}` : url;
+                });
+                return img;
+            } catch {
+                if (attempt < maxRetries) {
+                    console.warn(`Image load failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`);
+                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                }
+            }
+        }
+        return null;
+    };
+
     // Generate scene images
     const handleGenerate = async () => {
         setIsGenerating(true);
@@ -109,7 +142,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 mood,
                 effectiveSceneCount,
                 artStyle,
-                (p) => setProgress(p)
+                (p) => setProgress(Math.min(p, 50)) // Cap at 50% for URL generation phase
             );
 
             const newScenes: SceneImage[] = sections.map((sec, i) => ({
@@ -118,26 +151,32 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 loaded: false,
             }));
 
-            // Preload images
+            // Preload images with retry and timeout
             const loadedImages = new Map<number, HTMLImageElement>();
+            const totalToLoad = newScenes.length;
+
             await Promise.all(
-                newScenes.map((scene, i) =>
-                    new Promise<void>((resolve) => {
-                        const img = new Image();
-                        img.crossOrigin = "anonymous";
-                        img.onload = () => {
-                            loadedImages.set(i, img);
-                            newScenes[i].loaded = true;
-                            resolve();
-                        };
-                        img.onerror = () => resolve();
-                        img.src = scene.url;
-                    })
-                )
+                newScenes.map(async (scene, i) => {
+                    const img = await loadImageWithRetry(scene.url);
+                    if (img) {
+                        loadedImages.set(i, img);
+                        newScenes[i].loaded = true;
+                    }
+                    setProgress(50 + (50 * (i + 1)) / totalToLoad);
+                })
             );
 
             imagesRef.current = loadedImages;
             setScenes(newScenes);
+
+            const loadedCount = loadedImages.size;
+            if (loadedCount < totalToLoad) {
+                toast({
+                    title: "一部のシーン画像の読み込みに失敗",
+                    description: `${loadedCount}/${totalToLoad} シーンが正常に読み込まれました。失敗したシーンはグラデーション背景で表示されます。`,
+                    variant: loadedCount === 0 ? "destructive" : "default",
+                });
+            }
         } catch (e) {
             console.error("Scene generation failed:", e);
             toast({
@@ -322,6 +361,8 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
             ctx.restore();
 
             for (let i = 0; i < lineCount; i++) {
+                if (section.lines[0] === "[Instrumental]") continue;
+
                 const lineProgress = Math.max(0, Math.min(1, (sectionProgress * lineCount - i) * 1.8));
                 if (lineProgress <= 0) continue;
 
