@@ -4,21 +4,57 @@ import { CREATOR_CATEGORIES } from "./creator-templates";
 /**
  * Helper to fetch with exponential backoff for 429 errors
  */
-async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 10,
+  onRetry?: (attempt: number, waitTime: number, status: number) => void
+): Promise<Response> {
   let retries = 0;
   while (true) {
     const resp = await fetch(url, options);
 
     const retryCodes = [429, 503];
     if (retryCodes.includes(resp.status) && retries < maxRetries) {
-      // Starting with standard backoff, but allowing override for tests if needed (via world state or similar)
-      // For now, let's keep it simple and just reduce the base if it's a test environment
       const isTest = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
-      const baseWait = isTest ? 10 : 8000; // 5sから8sに拡張
-      const waitTime = Math.pow(2, retries) * baseWait + Math.random() * (isTest ? 5 : 2000);
+      // レート制限時は長めに待つ (8s -> 12s -> 24s ...)
+      const baseWait = isTest ? 10 : 8000;
+      let waitTime = Math.pow(1.5, retries) * baseWait + Math.random() * (isTest ? 5 : 2000);
+
+      // 可能であればAPIレスポンスから推奨待機時間(retryDelay)を取得
+      try {
+        const body = await resp.clone().json();
+
+        // --- 致命的なエラーの検知 (Daily Quota) ---
+        const msg = body?.error?.message || "";
+        if (msg.includes("GenerateRequestsPerDay") || msg.includes("limit: 0")) {
+          console.warn(`Gemini API: Daily quota or absolute limit reached. Skipping retry wait.`);
+          return resp; // 即座にリターンしてフォールバックへ
+        }
+
+        const details = body?.error?.details || [];
+        const retryInfo = details.find((d: any) => d["@type"]?.includes("RetryInfo"));
+        if (retryInfo?.retryDelay) {
+          const seconds = parseFloat(retryInfo.retryDelay);
+          if (!isNaN(seconds)) {
+            if (seconds > 20) {
+              // 待機時間が長すぎる場合はUIがフリーズするのを防ぐため、待たずに次のキー・モデルへフォールバックさせる
+              console.warn(`Gemini API suggested wait is too long (${seconds}s). Skipping wait to try fallbacks.`);
+              return resp;
+            }
+            waitTime = (seconds * 1000) + (isTest ? 0 : 1000); // 余裕を持って1秒追加
+            console.log(`Gemini API suggested wait: ${seconds}s`);
+          }
+        }
+      } catch (e) {
+        // JSONでない場合やRetryInfoがない場合は無視してバックオフ計算値を使用
+      }
 
       const displayWait = Math.round(waitTime / 1000);
       console.warn(`Gemini API ${resp.status} detected. Retrying in ${displayWait}s... (Attempt ${retries + 1}/${maxRetries})`);
+
+      onRetry?.(retries + 1, waitTime, resp.status);
+
       await new Promise(resolve => setTimeout(resolve, waitTime));
       retries++;
       continue;
@@ -28,20 +64,38 @@ async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 5)
   }
 }
 
-// 利用可能なモデル候補を定義（ListModels API で確認済み）
-// ※ gemini-1.5-flash 系は全て廃止済み、使用不可
-const GEMINI_MODELS = [
-  "gemini-2.5-flash",       // 最新・最速・推奨
-  "gemini-2.0-flash",       // 安定バックアップ
-  "gemini-2.0-flash-001",   // バージョン固定バックアップ
+// 1日の上限がより広い（通常1500回/日）安定版モデルを優先
+export const GEMINI_MODELS = [
+  "gemini-2.5-flash",       // 正常稼働が確認できた最新モデル
 ];
 
-function getGeminiConfig(modelIndex = 0) {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
+// 複数のAPIキーを読み込み (キーローテーション用)
+// ※ Viteの import.meta.env[key] は動的参照ができないため、静的に記述
+export const GEMINI_API_KEYS = (() => {
+  const keys: string[] = [];
+
+  const k0 = import.meta.env.VITE_GEMINI_API_KEY;
+  if (k0) keys.push(k0);
+
+  const k1 = import.meta.env.VITE_GEMINI_API_KEY_1;
+  if (k1 && !keys.includes(k1)) keys.push(k1);
+
+  const k2 = import.meta.env.VITE_GEMINI_API_KEY_2;
+  if (k2 && !keys.includes(k2)) keys.push(k2);
+
+  return keys.length > 0 ? keys : [""]; // 最低1つは確保
+})();
+
+// RESOURCE_EXHAUSTED (1日の上限到達) を起こした (キー索引, モデル) の組み合わせを記録
+const exhaustedCombinations = new Set<string>();
+
+function getGeminiConfig(modelIndex = 0, keyIndex = 0) {
+  const key = GEMINI_API_KEYS[keyIndex % GEMINI_API_KEYS.length];
   const model = GEMINI_MODELS[Math.min(modelIndex, GEMINI_MODELS.length - 1)];
 
   return {
     key,
+    keyIndex: keyIndex % GEMINI_API_KEYS.length,
     model,
     streamUrl: `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${key}&alt=sse`,
     postUrl: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`
@@ -76,34 +130,60 @@ async function handleApiError(resp: Response, context: string): Promise<never> {
 async function geminiPostWithFallback(
   body: object,
   context: string,
-  configOverride?: Partial<{ temperature: number }>
+  configOverride?: Partial<{ temperature: number }>,
+  onRetry?: (msg: string) => void
 ): Promise<Response> {
-  for (let i = 0; i < GEMINI_MODELS.length; i++) {
-    const config = getGeminiConfig(i);
-    const resp = await fetchWithRetry(config.postUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...body,
-        ...(configOverride ? { generationConfig: configOverride } : {})
-      }),
-    });
+  let lastResp: Response | null = null;
+  let lastModel = "";
 
-    if (resp.ok) {
-      console.log(`${context}: success with ${config.model}`);
-      return resp;
+  // 全てのキーと全てのモデルの組み合わせを試行
+  for (let k = 0; k < GEMINI_API_KEYS.length; k++) {
+    for (let i = 0; i < GEMINI_MODELS.length; i++) {
+      const config = getGeminiConfig(i, k);
+      const comboKey = `${config.keyIndex}-${config.model}`;
+
+      // すでにこのセッションで RESOURCE_EXHAUSTED になった組み合わせはスキップ
+      if (exhaustedCombinations.has(comboKey)) {
+        console.log(`Skipping exhausted combo: ${comboKey}`);
+        continue;
+      }
+
+      lastModel = config.model;
+
+      lastResp = await fetchWithRetry(
+        config.postUrl,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...body,
+            ...(configOverride ? { generationConfig: configOverride } : {})
+          }),
+        },
+        1, // キーローテーション時はリトライを少なめに（1回だけ）
+        (attempt, wait) => {
+          onRetry?.(`キー#${config.keyIndex + 1} / モデル ${config.model} 制限。${Math.round(wait / 1000)}秒後に再試行中`);
+        }
+      );
+
+      if (lastResp.ok) {
+        console.log(`${context}: success with key#${config.keyIndex + 1} and ${config.model}`);
+        return lastResp;
+      }
+
+      const errorBody = await lastResp.clone().text();
+      // "GenerateRequestsPerDay" または "limit: 0" を含む場合はデイリークォータとみなし、そのセッションで完全にスキップ
+      if (lastResp.status === 429 && (errorBody.includes("GenerateRequestsPerDay") || errorBody.includes("limit: 0"))) {
+        console.warn(`${context}: Daily quota exhausted for key#${config.keyIndex + 1} and ${config.model}. Marking for skip.`);
+        exhaustedCombinations.add(comboKey);
+      }
+
+      console.warn(`${context}: combo ${comboKey} failed (${lastResp.status}). Trying next...`);
     }
-    console.warn(`${context}: ${config.model} failed (${resp.status}). Trying next...`);
   }
 
-  // 最後のモデルのレスポンスを使ってエラーハンドリング
-  const lastConfig = getGeminiConfig(GEMINI_MODELS.length - 1);
-  const lastResp = await fetch(lastConfig.postUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  await handleApiError(lastResp, context);
+  // 全ての組み合わせで失敗した場合
+  await handleApiError(lastResp!, `${context} (${lastModel})`);
 }
 
 export interface GenerateRequest {
@@ -236,37 +316,62 @@ Generate the song and analysis now:`;
   let resp: Response | null = null;
   let lastErrorModel = "";
 
-  // 利用可能なモデルを順番に試行
-  for (let i = 0; i < GEMINI_MODELS.length; i++) {
-    const currentConfig = getGeminiConfig(i);
-    if (!currentConfig.key) {
-      console.warn(`API key not set for model ${currentConfig.model}. Skipping.`);
-      continue;
-    }
-    try {
-      resp = await fetchWithRetry(currentConfig.streamUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4096,
-          }
-        }),
-      });
+  // 全てのキーと全てのモデルの組み合わせを試行
+  console.log(`Starting generation loop. Available API Keys: ${GEMINI_API_KEYS.length}, Models: ${GEMINI_MODELS.length}`);
 
-      if (resp.ok) {
-        console.log(`Generation started successfully using ${currentConfig.model}`);
-        break;
-      } else {
-        console.warn(`Model ${currentConfig.model} failed with status ${resp.status}. Trying next...`);
+  for (let k = 0; k < GEMINI_API_KEYS.length; k++) {
+    for (let i = 0; i < GEMINI_MODELS.length; i++) {
+      const currentConfig = getGeminiConfig(i, k);
+      const comboKey = `${currentConfig.keyIndex}-${currentConfig.model}`;
+
+      if (exhaustedCombinations.has(comboKey)) {
+        continue;
+      }
+
+      if (!currentConfig.key) {
+        console.warn(`API key not set for index ${k}. Skipping.`);
+        continue;
+      }
+
+      try {
+        resp = await fetchWithRetry(
+          currentConfig.streamUrl,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 4096,
+              }
+            }),
+          },
+          1, // キーローテーション時はリトライを少なめに
+          (attempt, wait) => {
+            const waitSec = Math.round(wait / 1000);
+            onDelta(`\n[キー#${currentConfig.keyIndex + 1} / モデル ${currentConfig.model} 制限。${waitSec}秒後に再試行中]\n`);
+          }
+        );
+
+        if (resp.ok) {
+          console.log(`Generation started successfully using key#${currentConfig.keyIndex + 1} and ${currentConfig.model}`);
+          break;
+        } else {
+          const errorBody = await resp.clone().text();
+          if (resp.status === 429 && (errorBody.includes("GenerateRequestsPerDay") || errorBody.includes("limit: 0"))) {
+            console.warn(`Daily quota exhausted for key#${currentConfig.keyIndex + 1} and ${currentConfig.model}. Marking for skip.`);
+            exhaustedCombinations.add(comboKey);
+          }
+          console.warn(`Combo ${comboKey} failed with status ${resp.status}. Trying next...`);
+          lastErrorModel = currentConfig.model;
+        }
+      } catch (err) {
+        console.error(`Attempt with combo ${comboKey} threw error:`, err);
         lastErrorModel = currentConfig.model;
       }
-    } catch (err) {
-      console.error(`Attempt with ${currentConfig.model} threw error:`, err);
-      lastErrorModel = currentConfig.model;
     }
+    if (resp && resp.ok) break;
   }
 
   if (!resp || !resp.ok || !resp.body) {
@@ -371,7 +476,7 @@ Output ONLY the descriptive prompt in English. No other text.`;
   // Return the AI generated image URL. 
   // If Pollinations is down, the frontend will fail to load it, 
   // but it won't crash the logic here.
-  return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
+  return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true&model=turbo&enhance=false`;
 }
 
 /**
@@ -396,7 +501,7 @@ export async function generateMVSceneImages(
   mood: string,
   sceneCount: number,
   artStyle: string = "cinematic",
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number, status?: string) => void
 ): Promise<string[]> {
   const styleBoost = ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS["cinematic"];
 
@@ -429,7 +534,7 @@ CRITICAL SCENE REQUIREMENTS:
    - SEASONAL and TIME cues: "autumn twilight", "frozen winter dawn", "humid summer midnight"
 
 3. CINEMATOGRAPHY (MANDATORY for every scene):
-   - CAMERA ANGLE: Choose from: extreme close-up (eyes/hands), medium close-up (face/shoulders), medium shot (waist up), wide shot (full body in environment), extreme wide/aerial (landscape dominant)
+   - CAMERA ANGLE: Choose from: extreme close-up (eyes/hands), medium close-up (face/shou lders), medium shot (waist up), wide shot (full body in environment), extreme wide/aerial (landscape dominant)
    - LENS EFFECT: "shot on 35mm anamorphic lens with shallow depth of field", "wide-angle 24mm with dramatic perspective", "telephoto compression"
    - LIGHTING: Be precise — "golden hour side-lighting casting long shadows", "neon pink and blue reflections on wet pavement", "single overhead spotlight in darkness", "diffused overcast light"
 
@@ -450,12 +555,13 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 2. [image prompt with character + environment + camera + lighting]
 ...`;
 
-  onProgress?.(5);
+  onProgress?.(5, "シーン記述を生成中...");
 
   const resp = await geminiPostWithFallback(
     { contents: [{ parts: [{ text: geminiPrompt }] }] },
     "シーン記述の生成",
-    { temperature: 0.85 }
+    { temperature: 0.85 },
+    (msg) => onProgress?.(5, msg)
   );
   const data = await resp.json();
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -499,8 +605,9 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
     const encodedPrompt = encodeURIComponent(fullPrompt);
     const seed = Math.floor(Math.random() * 1000000);
 
-    // Pollinations.ai free tier (flux is default, no enhance needed)
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true`;
+    // Pollinations.ai stability optimization:
+    // Adding model=turbo and enhance=false to hit more stable endpoints
+    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true&model=turbo&enhance=false`;
     imageUrls.push(url);
 
     onProgress?.(20 + (80 * (i + 1)) / sceneCount);

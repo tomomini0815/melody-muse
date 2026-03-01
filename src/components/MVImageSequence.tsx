@@ -69,6 +69,8 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     const [isExporting, setIsExporting] = useState(false);
     const [scenes, setScenes] = useState<SceneImage[]>([]);
     const [progress, setProgress] = useState(0);
+    const [statusMessage, setStatusMessage] = useState("AIシーンを生成中...");
+    const cachedImagesRef = useRef<{ key: string, urls: string[] | null }>({ key: "", urls: null });
     const imagesRef = useRef<Map<number, HTMLImageElement>>(new Map());
     // Film grain noise canvas
     const grainCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -99,32 +101,50 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     }, []);
 
     // Load a single image with timeout and retry
-    const loadImageWithRetry = async (url: string, maxRetries = 2, timeoutMs = 30000): Promise<HTMLImageElement | null> => {
+    const loadImageWithRetry = async (url: string, maxRetries = 2, timeoutMs = 40000): Promise<HTMLImageElement | null> => {
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 const img = await new Promise<HTMLImageElement>((resolve, reject) => {
                     const image = new Image();
-                    image.crossOrigin = "anonymous";
+
+                    // On final attempts, try removing crossOrigin to see if it bypasses some Cloudflare 530s
+                    // (Note: this will taint the canvas, but at least the image displays)
+                    if (attempt < maxRetries) {
+                        image.crossOrigin = "anonymous";
+                    }
+
                     const timer = setTimeout(() => {
                         image.src = "";
                         reject(new Error("timeout"));
                     }, timeoutMs);
+
                     image.onload = () => {
                         clearTimeout(timer);
                         resolve(image);
                     };
+
                     image.onerror = () => {
                         clearTimeout(timer);
                         reject(new Error("load error"));
                     };
-                    // Add cache-busting on retry to force fresh request
-                    image.src = attempt > 0 ? `${url}&retry=${attempt}` : url;
+
+                    // Rotation logic for different Pollinations endpoints
+                    let finalUrl = url;
+                    if (attempt === 1) {
+                        // Try forcing different seed and model on first retry
+                        finalUrl = `${url}&retry=1&seed=${Math.floor(Math.random() * 100000)}&model=turbo&enhance=false`;
+                    } else if (attempt >= 2) {
+                        // Try different subdomain if image.pollinations is blocked
+                        finalUrl = url.replace("image.pollinations.ai/prompt", "pollinations.ai/p") + "&render=true";
+                    }
+
+                    image.src = finalUrl;
                 });
                 return img;
-            } catch {
+            } catch (err) {
                 if (attempt < maxRetries) {
-                    console.warn(`Image load failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`);
-                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                    console.warn(`Image load failed (attempt ${attempt + 1}/${maxRetries + 1}), retrying...`, err);
+                    await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
                 }
             }
         }
@@ -135,15 +155,34 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     const handleGenerate = async () => {
         setIsGenerating(true);
         setProgress(0);
+
+        const cacheKey = `${lyrics}-${mood}-${artStyle}-${effectiveSceneCount}`;
+
         try {
-            const imageUrls = await generateMVSceneImages(
-                lyrics,
-                styleTags,
-                mood,
-                effectiveSceneCount,
-                artStyle,
-                (p) => setProgress(Math.min(p, 50)) // Cap at 50% for URL generation phase
-            );
+            let imageUrls: string[] = [];
+
+            // Check cache
+            if (cachedImagesRef.current.key === cacheKey && cachedImagesRef.current.urls) {
+                console.log("Using cached scene images");
+                setStatusMessage("キャッシュからシーンを復元中...");
+                imageUrls = cachedImagesRef.current.urls;
+                setProgress(50);
+            } else {
+                imageUrls = await generateMVSceneImages(
+                    lyrics,
+                    styleTags,
+                    mood,
+                    effectiveSceneCount,
+                    artStyle,
+                    (p, status) => {
+                        setProgress(Math.min(p, 50));
+                        if (status) setStatusMessage(status);
+                        else setStatusMessage("AIシーンを生成中...");
+                    }
+                );
+                // Save to cache
+                cachedImagesRef.current = { key: cacheKey, urls: imageUrls };
+            }
 
             const newScenes: SceneImage[] = sections.map((sec, i) => ({
                 url: imageUrls[i] || imageUrls[imageUrls.length - 1] || "",
@@ -162,7 +201,9 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                         loadedImages.set(i, img);
                         newScenes[i].loaded = true;
                     }
-                    setProgress(50 + (50 * (i + 1)) / totalToLoad);
+                    const p = 50 + (50 * (i + 1)) / totalToLoad;
+                    setProgress(p);
+                    setStatusMessage(`画像を読み込み中... (${Math.round(p)}%)`);
                 })
             );
 
@@ -553,7 +594,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 {isGenerating && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm">
                         <Loader2 className="w-10 h-10 text-primary animate-spin mb-3" />
-                        <p className="text-sm text-white/80 mb-2">AIシーンを生成中...</p>
+                        <p className="text-sm text-white/80 mb-2">{statusMessage}</p>
                         <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-primary rounded-full transition-all duration-500"
