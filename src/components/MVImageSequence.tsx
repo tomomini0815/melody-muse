@@ -3,7 +3,7 @@ import { parseLyrics, getVisualTheme, LyricsSection } from "@/lib/lyrics-parser"
 import { generateMVSceneImages } from "@/lib/stream-chat";
 import { Mood } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, RotateCcw, Download, Loader2, ImageIcon } from "lucide-react";
+import { Play, Pause, RotateCcw, Download, Loader2, ImageIcon, Music, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
@@ -75,9 +75,17 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     // Film grain noise canvas
     const grainCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
+    // Audio sync
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const audioFileInputRef = useRef<HTMLInputElement>(null);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [audioFileName, setAudioFileName] = useState<string | null>(null);
+    const [audioDuration, setAudioDuration] = useState<number | null>(null);
+    const [isMuted, setIsMuted] = useState(false);
+
     const theme = getVisualTheme(mood);
     const sections = parseLyrics(lyrics, bpm);
-    const totalDuration = sections.length > 0 ? sections[sections.length - 1].endTime : 60;
+    const totalDuration = audioDuration || (sections.length > 0 ? sections[sections.length - 1].endTime : 60);
     const effectiveSceneCount = requestedSceneCount || sections.length;
 
     // Initialize grain canvas once
@@ -482,28 +490,108 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
         startTimeRef.current = performance.now();
         setIsPlaying(true);
         animFrameRef.current = requestAnimationFrame(animate);
-    }, [animate]);
+        // Sync audio
+        if (audioRef.current && audioUrl) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(() => { });
+        }
+    }, [animate, audioUrl]);
 
     const pause = useCallback(() => {
         cancelAnimationFrame(animFrameRef.current);
         setIsPlaying(false);
+        if (audioRef.current) audioRef.current.pause();
     }, []);
 
     const reset = useCallback(() => {
         cancelAnimationFrame(animFrameRef.current);
         setIsPlaying(false);
         setCurrentTime(0);
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
     }, []);
 
-    // Export
+    // Handle audio file upload
+    const handleAudioUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith("audio/")) {
+            toast({ title: "音声ファイルのみアップロード可能です", variant: "destructive" });
+            return;
+        }
+
+        // Revoke old URL
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+
+        const url = URL.createObjectURL(file);
+        setAudioUrl(url);
+        setAudioFileName(file.name);
+
+        // Get duration
+        const audio = new Audio(url);
+        audio.addEventListener("loadedmetadata", () => {
+            setAudioDuration(audio.duration);
+            toast({ title: `🎵 ${file.name} を読み込みました (${Math.floor(audio.duration / 60)}:${Math.floor(audio.duration % 60).toString().padStart(2, "0")})` });
+        });
+        audio.addEventListener("error", () => {
+            toast({ title: "音声ファイルの読み込みに失敗しました", variant: "destructive" });
+            setAudioUrl(null);
+            setAudioFileName(null);
+        });
+    }, [audioUrl]);
+
+    const removeAudio = useCallback(() => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+        setAudioFileName(null);
+        setAudioDuration(null);
+        if (audioFileInputRef.current) audioFileInputRef.current.value = "";
+    }, [audioUrl]);
+
+    const toggleMute = useCallback(() => {
+        setIsMuted(prev => {
+            if (audioRef.current) audioRef.current.muted = !prev;
+            return !prev;
+        });
+    }, []);
+
+    // Export (with audio if available)
     const handleExport = useCallback(async () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         setIsExporting(true);
         try {
             // @ts-ignore
-            const stream = canvas.captureStream(30);
-            const recorder = new MediaRecorder(stream, {
+            const videoStream = canvas.captureStream(30) as MediaStream;
+
+            // Merge audio stream if available
+            let combinedStream = videoStream;
+            let audioCtx: AudioContext | null = null;
+            let audioSource: MediaElementAudioSourceNode | null = null;
+            let audioDest: MediaStreamAudioDestinationNode | null = null;
+
+            if (audioRef.current && audioUrl) {
+                audioCtx = new AudioContext();
+                audioSource = audioCtx.createMediaElementSource(audioRef.current);
+                audioDest = audioCtx.createMediaStreamDestination();
+                audioSource.connect(audioDest);
+                audioSource.connect(audioCtx.destination); // Also play through speakers
+
+                combinedStream = new MediaStream([
+                    ...videoStream.getVideoTracks(),
+                    ...audioDest.stream.getAudioTracks(),
+                ]);
+            }
+
+            const recorder = new MediaRecorder(combinedStream, {
                 mimeType: "video/webm;codecs=vp9",
                 videoBitsPerSecond: 12_000_000,
             });
@@ -518,11 +606,22 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 a.click();
                 URL.revokeObjectURL(url);
                 setIsExporting(false);
+                // Reconnect audio to speakers after export
+                if (audioSource && audioCtx) {
+                    try { audioSource.disconnect(); } catch { }
+                    audioSource.connect(audioCtx.destination);
+                }
             };
 
             startTimeRef.current = performance.now();
             setIsPlaying(true);
             recorder.start();
+
+            // Start audio sync during export
+            if (audioRef.current && audioUrl) {
+                audioRef.current.currentTime = 0;
+                audioRef.current.play().catch(() => { });
+            }
 
             const recordAnimate = (timestamp: number) => {
                 const elapsed = timestamp - startTimeRef.current;
@@ -534,13 +633,14 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                 } else {
                     recorder.stop();
                     setIsPlaying(false);
+                    if (audioRef.current) audioRef.current.pause();
                 }
             };
             requestAnimationFrame(recordAnimate);
         } catch {
             setIsExporting(false);
         }
-    }, [totalDuration, sections, theme]);
+    }, [totalDuration, sections, theme, audioUrl]);
 
     // Init canvas
     useEffect(() => {
@@ -574,6 +674,19 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
 
     return (
         <div className="space-y-3">
+            {/* Hidden audio element */}
+            {audioUrl && (
+                <audio ref={audioRef} src={audioUrl} preload="auto" muted={isMuted} />
+            )}
+            {/* Hidden file input */}
+            <input
+                ref={audioFileInputRef}
+                type="file"
+                accept="audio/*"
+                onChange={handleAudioUpload}
+                className="hidden"
+            />
+
             <div className="relative rounded-xl overflow-hidden border border-primary/20 shadow-2xl bg-black">
                 <canvas ref={canvasRef} className="w-full aspect-video" style={{ imageRendering: "auto" }} />
 
@@ -609,6 +722,14 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* Audio badge overlay */}
+                {audioFileName && !isGenerating && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-2.5 py-1">
+                        <Music className="w-3 h-3 text-primary" />
+                        <span className="text-[10px] text-white/80 max-w-[120px] truncate">{audioFileName}</span>
                     </div>
                 )}
 
@@ -671,18 +792,55 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                     {formatTime(currentTime)} / {formatTime(totalDuration)}
                 </span>
 
-                {scenes.length > 0 && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleExport}
-                        disabled={isExporting}
-                        className="h-9 glass gap-1.5 px-3 text-primary"
-                    >
-                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        <span className="text-xs">{isExporting ? "録画中..." : "ダウンロード"}</span>
-                    </Button>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {/* Audio upload / controls */}
+                    {audioUrl ? (
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={toggleMute}
+                                className="h-9 glass gap-1 px-2"
+                                title={isMuted ? "ミュート解除" : "ミュート"}
+                            >
+                                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={removeAudio}
+                                className="h-9 glass gap-1.5 px-2 text-destructive hover:text-destructive"
+                                title="音声を削除"
+                            >
+                                <Music className="w-4 h-4" />
+                                <span className="text-[10px]">✕</span>
+                            </Button>
+                        </>
+                    ) : (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => audioFileInputRef.current?.click()}
+                            className="h-9 glass gap-1.5 px-3 text-primary"
+                        >
+                            <Music className="w-4 h-4" />
+                            <span className="text-xs">音声追加</span>
+                        </Button>
+                    )}
+
+                    {scenes.length > 0 && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleExport}
+                            disabled={isExporting}
+                            className="h-9 glass gap-1.5 px-3 text-primary"
+                        >
+                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            <span className="text-xs">{isExporting ? "録画中..." : "ダウンロード"}</span>
+                        </Button>
+                    )}
+                </div>
             </div>
         </div>
     );
