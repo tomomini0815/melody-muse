@@ -1,5 +1,4 @@
 import { GeneratedPrompt } from "./types";
-import { turso } from "./turso";
 
 const HISTORY_KEY = "suno-prompt-history";
 const MIGRATION_DONE_KEY = "turso-migration-complete";
@@ -32,73 +31,55 @@ export async function migrateToTurso() {
 
 export async function getHistory(): Promise<GeneratedPrompt[]> {
   try {
-    const rs = await turso.execute("SELECT * FROM lyrics_history ORDER BY created_at DESC");
-    return rs.rows.map(row => ({
-      id: row.id as string,
-      lyrics: row.lyrics as string,
-      styleTags: row.style_tags as string,
+    const res = await fetch("/api/history");
+    if (!res.ok) throw new Error("Failed to fetch history");
+    const rows = await res.json();
+
+    return rows.map((row: any) => ({
+      id: row.id,
+      lyrics: row.lyrics,
+      styleTags: row.style_tags,
       meta: {
         bpm: Number(row.bpm),
-        key: row.musical_key as string,
-        instruments: row.instruments as string,
+        key: row.musical_key,
+        instruments: row.instruments,
       },
-      config: JSON.parse(row.config as string),
+      config: JSON.parse(row.config),
       createdAt: Number(row.created_at),
       isFavorite: Boolean(row.is_favorite),
-      coverUrl: row.cover_url as string | undefined,
-      originalPrompt: row.original_prompt as string | undefined,
+      coverUrl: row.cover_url || undefined,
+      originalPrompt: row.original_prompt || undefined,
     }));
   } catch (error) {
-    console.error("Failed to fetch history from Turso:", error);
+    console.error("Failed to fetch history:", error);
     return [];
   }
 }
 
 export async function saveToHistory(prompt: GeneratedPrompt) {
   try {
-    await turso.execute({
-      sql: `INSERT OR REPLACE INTO lyrics_history 
-            (id, lyrics, style_tags, bpm, musical_key, instruments, config, created_at, is_favorite, cover_url, original_prompt) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        prompt.id,
-        prompt.lyrics,
-        prompt.styleTags,
-        prompt.meta.bpm,
-        prompt.meta.key,
-        prompt.meta.instruments,
-        JSON.stringify(prompt.config),
-        prompt.createdAt,
-        prompt.isFavorite ? 1 : 0,
-        prompt.coverUrl || null,
-        prompt.originalPrompt || null,
-      ],
+    await fetch("/api/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
     });
   } catch (error) {
-    console.error("Failed to save to Turso:", error);
-    // Fallback back to localStorage if Turso is not configured? 
-    // For now, just log the error.
+    console.error("Failed to save to history API:", error);
   }
 }
 
 export async function toggleFavorite(id: string): Promise<boolean> {
   try {
-    const rs = await turso.execute({
-      sql: "SELECT is_favorite FROM lyrics_history WHERE id = ?",
-      args: [id]
+    const res = await fetch("/api/history", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
     });
-
-    if (rs.rows.length === 0) return false;
-
-    const newStatus = rs.rows[0].is_favorite ? 0 : 1;
-    await turso.execute({
-      sql: "UPDATE lyrics_history SET is_favorite = ? WHERE id = ?",
-      args: [newStatus, id]
-    });
-
-    return Boolean(newStatus);
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.isFavorite;
   } catch (error) {
-    console.error("Failed to toggle favorite in Turso:", error);
+    console.error("Failed to toggle favorite:", error);
     return false;
   }
 }
@@ -110,11 +91,10 @@ export async function getFavorites(): Promise<GeneratedPrompt[]> {
 
 export async function deleteFromHistory(id: string) {
   try {
-    await turso.execute({
-      sql: "DELETE FROM lyrics_history WHERE id = ?",
-      args: [id]
+    await fetch(`/api/history?id=${encodeURIComponent(id)}`, {
+      method: "DELETE"
     });
   } catch (error) {
-    console.error("Failed to delete from Turso:", error);
+    console.error("Failed to delete from history API:", error);
   }
 }
