@@ -470,7 +470,8 @@ TRANSLATED LYRICS:`;
 
 /**
  * Vercel Serverless Function経由でAI Hordeの画像を生成する（CORS回避）
- * サーバーサイドでジョブ投入→ポーリング→結果取得を行う。
+ * Phase 1: /api/generate-image にPOSTしてジョブIDを取得（瞬時）
+ * Phase 2: /api/check-image?id=jobId をポーリングして完了を待つ（各リクエスト瞬時）
  */
 async function generateImageViaHorde(
   prompt: string,
@@ -478,9 +479,10 @@ async function generateImageViaHorde(
   height = 1024,
   onStatus?: (msg: string) => void
 ): Promise<string> {
-  onStatus?.("画像生成サーバーにリクエスト中...");
+  onStatus?.("画像生成リクエストを送信中...");
 
-  const resp = await fetch("/api/generate-image", {
+  // Phase 1: Submit the job
+  const submitResp = await fetch("/api/generate-image", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -490,15 +492,42 @@ async function generateImageViaHorde(
     }),
   });
 
-  if (!resp.ok) {
-    const errData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
-    throw new Error(`画像生成に失敗しました: ${errData.error || resp.statusText}`);
+  if (!submitResp.ok) {
+    const errData = await submitResp.json().catch(() => ({ error: `HTTP ${submitResp.status}` }));
+    throw new Error(`画像生成に失敗しました: ${errData.error || submitResp.statusText}`);
   }
 
-  const data = await resp.json();
-  if (!data.imageUrl) throw new Error("画像URLを取得できませんでした。");
+  const submitData = await submitResp.json();
+  if (!submitData.jobId) throw new Error("ジョブIDを取得できませんでした。");
 
-  return data.imageUrl;
+  // Phase 2: Poll for completion
+  const maxPolls = 60;
+  const pollInterval = 2000;
+
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+    const checkResp = await fetch(`/api/check-image?id=${submitData.jobId}`);
+    const checkData = await checkResp.json();
+
+    if (checkData.faulted) {
+      throw new Error("画像生成に失敗しました。再度お試しください。");
+    }
+
+    if (checkData.done && checkData.imageUrl) {
+      return checkData.imageUrl;
+    }
+
+    if (checkData.error) {
+      throw new Error(`画像生成エラー: ${checkData.error}`);
+    }
+
+    const queuePos = checkData.queue_position ?? "?";
+    const waitTime = checkData.wait_time ?? "?";
+    onStatus?.(`画像を生成中... (キュー: ${queuePos}, 推定${waitTime}秒)`);
+  }
+
+  throw new Error("画像生成がタイムアウトしました。サーバーが混雑している可能性があります。");
 }
 
 export async function generateCoverArt(lyrics: string, styleTags: string): Promise<string> {
