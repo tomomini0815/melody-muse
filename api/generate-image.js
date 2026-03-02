@@ -20,9 +20,9 @@ export default async function handler(req, res) {
             body: JSON.stringify({
                 prompt: prompt.substring(0, 1000),
                 params: {
-                    width: Math.min(width || 1024, 1024),
-                    height: Math.min(height || 1024, 1024),
-                    steps: 25,
+                    width: Math.min(width || 512, 512),
+                    height: Math.min(height || 512, 512),
+                    steps: 20,
                     cfg_scale: 7,
                     n: 1,
                 },

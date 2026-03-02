@@ -555,11 +555,11 @@ Output ONLY the descriptive prompt in English. No other text.`;
     .replace(/```[a-z]*\n?|```/g, "")
     .trim();
 
-  // 3. Generate image via AI Horde
+  // 3. Generate image via AI Horde (512x512 for anonymous user limits)
   return await generateImageViaHorde(
     `${cleanPrompt}, album cover art, professional, high quality, no text, no watermark`,
-    1024,
-    1024
+    512,
+    512
   );
 }
 
@@ -689,8 +689,8 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
     try {
       const url = await generateImageViaHorde(
         fullPrompt,
-        1024,
-        576, // 16:9 aspect for MV (closest to 1280x720 within 1024 limit)
+        512,
+        512, // Square for AI Horde anonymous user limits
         (status) => onProgress?.(20 + (70 * i) / sceneCount, `シーン ${i + 1}: ${status}`)
       );
       imageUrls.push(url);
