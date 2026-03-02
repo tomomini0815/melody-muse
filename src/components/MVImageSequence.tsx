@@ -101,17 +101,14 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
     }, []);
 
     // Load a single image with timeout and retry
-    const loadImageWithRetry = async (url: string, maxRetries = 2, timeoutMs = 40000): Promise<HTMLImageElement | null> => {
+    const loadImageWithRetry = async (url: string, maxRetries = 2, timeoutMs = 30000): Promise<HTMLImageElement | null> => {
+        if (!url) return null; // Skip empty URLs (failed generations)
+
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 const img = await new Promise<HTMLImageElement>((resolve, reject) => {
                     const image = new Image();
-
-                    // On final attempts, try removing crossOrigin to see if it bypasses some Cloudflare 530s
-                    // (Note: this will taint the canvas, but at least the image displays)
-                    if (attempt < maxRetries) {
-                        image.crossOrigin = "anonymous";
-                    }
+                    image.crossOrigin = "anonymous";
 
                     const timer = setTimeout(() => {
                         image.src = "";
@@ -128,17 +125,7 @@ export function MVImageSequence({ lyrics, mood, bpm, styleTags, coverUrl, artSty
                         reject(new Error("load error"));
                     };
 
-                    // Rotation logic for different Pollinations endpoints
-                    let finalUrl = url;
-                    if (attempt === 1) {
-                        // Try forcing different seed and model on first retry
-                        finalUrl = `${url}&retry=1&seed=${Math.floor(Math.random() * 100000)}&model=turbo&enhance=false`;
-                    } else if (attempt >= 2) {
-                        // Try different subdomain if image.pollinations is blocked
-                        finalUrl = url.replace("image.pollinations.ai/prompt", "pollinations.ai/p") + "&render=true";
-                    }
-
-                    image.src = finalUrl;
+                    image.src = url;
                 });
                 return img;
             } catch (err) {

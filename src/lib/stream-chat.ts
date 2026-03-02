@@ -83,6 +83,9 @@ export const GEMINI_API_KEYS = (() => {
   const k2 = import.meta.env.VITE_GEMINI_API_KEY_2;
   if (k2 && !keys.includes(k2)) keys.push(k2);
 
+  const k3 = import.meta.env.VITE_GEMINI_API_KEY_3;
+  if (k3 && !keys.includes(k3)) keys.push(k3);
+
   return keys.length > 0 ? keys : [""]; // 最低1つは確保
 })();
 
@@ -183,7 +186,13 @@ async function geminiPostWithFallback(
   }
 
   // 全ての組み合わせで失敗した場合
-  await handleApiError(lastResp!, `${context} (${lastModel})`);
+  if (!lastResp) {
+    // 全てのキー/モデルが exhaustedCombinations に入っていてスキップされた場合
+    // セッション中のキャッシュをクリアして再試行可能にする
+    exhaustedCombinations.clear();
+    throw new Error("すべてのAPIキー/モデルの組み合わせが制限に達しています。ページを再読み込みしてから再度お試しください。");
+  }
+  await handleApiError(lastResp, `${context} (${lastModel})`);
 }
 
 export interface GenerateRequest {
@@ -237,6 +246,16 @@ Artist Style Reference: ${config.customArtist || config.artist || "None"}
 Duration: ${config.duration}
 Target Language: ${targetLang}
 Instrumental Mode: ${config.instrumental ? "ON (BGM / No Vocals)" : "OFF (Vocal Song)"}
+
+${(config.customArtist || config.artist) ? `### IMPORTANT ANTI-COPYRIGHT INSTRUCTION (Artist Style):
+The user has provided an "Artist Style Reference". 
+NEVER output the real name of the artist in the [Style & Meta] tags or anywhere else.
+Instead, DECOMPOSE the artist's style into detailed musical characteristics, vocal qualities, and emotional tones.
+For example, instead of "Taylor Swift", use "bright female vocal, storytelling pop, acoustic guitar pop, emotional".
+Instead of "Michael Jackson", use "rhythmic male vocal, tight pop funk, high ad-libs, dance pop".
+Translate the artist's essence into 3-5 descriptive English style tags.
+###
+` : ""}
 
 ${(() => {
       const cat = CREATOR_CATEGORIES.find(c => c.id === config.creatorCategory);
@@ -375,7 +394,11 @@ Generate the song and analysis now:`;
   }
 
   if (!resp || !resp.ok || !resp.body) {
-    await handleApiError(resp!, `歌詞の生成 (${lastErrorModel || "全モデル失敗"})`);
+    if (!resp) {
+      exhaustedCombinations.clear();
+      throw new Error("すべてのAPIキー/モデルの組み合わせが制限に達しています。ページを再読み込みしてから再度お試しください。");
+    }
+    await handleApiError(resp, `歌詞の生成 (${lastErrorModel || "全モデル失敗"})`);
   }
 
   const reader = resp.body.getReader();
@@ -445,6 +468,39 @@ TRANSLATED LYRICS:`;
   return translation;
 }
 
+/**
+ * Vercel Serverless Function経由でAI Hordeの画像を生成する（CORS回避）
+ * サーバーサイドでジョブ投入→ポーリング→結果取得を行う。
+ */
+async function generateImageViaHorde(
+  prompt: string,
+  width = 1024,
+  height = 1024,
+  onStatus?: (msg: string) => void
+): Promise<string> {
+  onStatus?.("画像生成サーバーにリクエスト中...");
+
+  const resp = await fetch("/api/generate-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: prompt.substring(0, 1000),
+      width: Math.min(width, 1024),
+      height: Math.min(height, 1024),
+    }),
+  });
+
+  if (!resp.ok) {
+    const errData = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }));
+    throw new Error(`画像生成に失敗しました: ${errData.error || resp.statusText}`);
+  }
+
+  const data = await resp.json();
+  if (!data.imageUrl) throw new Error("画像URLを取得できませんでした。");
+
+  return data.imageUrl;
+}
+
 export async function generateCoverArt(lyrics: string, styleTags: string): Promise<string> {
   // 1. Use Gemini to generate a descriptive image prompt
   const geminiPrompt = `Create a short, highly descriptive, artistic image generation prompt (max 50 words) for an album cover.
@@ -464,19 +520,18 @@ Output ONLY the descriptive prompt in English. No other text.`;
   const visualPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!visualPrompt) throw new Error("画像プロンプトが空です。");
 
-  // 2. Return Pollinations.ai URL with stability fallback
+  // 2. Clean up the prompt
   const cleanPrompt = visualPrompt
-    .replace(/^["'`\s]+|["'`\s]+$/g, "") // Remove surrounding quotes or whitespace
-    .replace(/```[a-z]*\n?|```/g, "") // Remove markdown code blocks if any
+    .replace(/^["'`\s]+|["'`\s]+$/g, "")
+    .replace(/```[a-z]*\n?|```/g, "")
     .trim();
 
-  const encodedPrompt = encodeURIComponent(cleanPrompt);
-  const seed = Math.floor(Math.random() * 1000000);
-
-  // Return the AI generated image URL. 
-  // If Pollinations is down, the frontend will fail to load it, 
-  // but it won't crash the logic here.
-  return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&seed=${seed}&nologo=true&model=turbo&enhance=false`;
+  // 3. Generate image via AI Horde
+  return await generateImageViaHorde(
+    `${cleanPrompt}, album cover art, professional, high quality, no text, no watermark`,
+    1024,
+    1024
+  );
 }
 
 /**
@@ -583,9 +638,8 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
 
   onProgress?.(20);
 
-  // 2. Generate image URLs for each scene
+  // 2. Generate actual images via AI Horde for each scene
   const imageUrls: string[] = [];
-  onProgress?.(20);
 
   for (let i = 0; i < Math.min(sceneDescs.length, sceneCount); i++) {
     const cleanPrompt = sceneDescs[i]
@@ -593,24 +647,31 @@ Output format — each scene on its own line, numbered 1-${sceneCount}:
       .replace(/```[a-z]*\n?|```/g, "")
       .trim();
 
-    // Build prompt with style boost and quality keywords, but keep it concise for URL limits
     const qualityTail = "photorealistic, sharp focus, cinematic lighting, masterpiece, no text, no watermark";
     let fullPrompt = `${styleBoost}, ${cleanPrompt}, ${qualityTail}`;
 
-    // Truncate to ~900 chars to keep the encoded URL under browser limits (~2048 chars)
-    if (fullPrompt.length > 900) {
-      fullPrompt = fullPrompt.substring(0, 900);
+    // Truncate to 1000 chars for AI Horde
+    if (fullPrompt.length > 1000) {
+      fullPrompt = fullPrompt.substring(0, 1000);
     }
 
-    const encodedPrompt = encodeURIComponent(fullPrompt);
-    const seed = Math.floor(Math.random() * 1000000);
+    onProgress?.(20 + (70 * i) / sceneCount, `シーン ${i + 1}/${sceneCount} を生成中...`);
 
-    // Pollinations.ai stability optimization:
-    // Adding model=turbo and enhance=false to hit more stable endpoints
-    const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&seed=${seed}&nologo=true&model=turbo&enhance=false`;
-    imageUrls.push(url);
+    try {
+      const url = await generateImageViaHorde(
+        fullPrompt,
+        1024,
+        576, // 16:9 aspect for MV (closest to 1280x720 within 1024 limit)
+        (status) => onProgress?.(20 + (70 * i) / sceneCount, `シーン ${i + 1}: ${status}`)
+      );
+      imageUrls.push(url);
+    } catch (err) {
+      console.warn(`Scene ${i + 1} generation failed, using placeholder:`, err);
+      // Use empty string; the frontend will show a gradient fallback
+      imageUrls.push("");
+    }
 
-    onProgress?.(20 + (80 * (i + 1)) / sceneCount);
+    onProgress?.(20 + (70 * (i + 1)) / sceneCount);
   }
 
   onProgress?.(100);
